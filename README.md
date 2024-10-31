@@ -11,7 +11,6 @@ A library for parsing and evaluating Sigma rules written in Rust.
 ## Features
 
 - Supports all [sigma modifiers](https://sigmahq.io/docs/basics/modifiers.html) except `expand`
-  modifiers
 - Supports the whole [Sigma condition](https://sigmahq.io/docs/basics/conditions.html) syntax using Pratt parsing
 - Written in 100% safe Rust
 - Extensive test suite
