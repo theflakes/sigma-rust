@@ -1,0 +1,40 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+    paths-ignore: [ "README.md" ]
+  pull_request:
+    branches: [ "master" ]
+    paths-ignore: [ "README.md" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get rules from SigmaHQ for testing
+        run: |
+          wget https://github.com/SigmaHQ/sigma/releases/download/r2024-09-02/sigma_all_rules.zip
+          unzip sigma_all_rules.zip -d sigma-main-rules
+
+      - name: Build
+        run: cargo build
+
+      - name: Run tests
+        run: cargo test -- --nocapture
+
+      - name: Run tests without default features
+        run: cargo test --no-default-features -- --nocapture
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Check fmt
+        run: cargo fmt --all -- --check

@@ -1,0 +1,30 @@
+[package]
+name = "sigma-rust"
+description = "a library for parsing and checking Sigma rules against log events"
+version = "0.1.0"
+edition = "2021"
+authors = ["Dr.-Ing. Johannes Pohl <johannes.pohl90@gmail.com>"]
+categories = ["parser-implementations", "data-structures"]
+keywords = ["sigma", "sigma-rules", "siem", "apt", "security"]
+readme = "README.md"
+rust-version = "1.81.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/jopohl/sigma-rust"
+
+[dependencies]
+base64 = "0.22.1"
+cidr = "0.3.0"
+glob-match = "0.2.1"
+regex = "1.11.0"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_yml = "0.0.12"
+strum = { version = "0.26.3", features = ["derive"] }
+thiserror = "1.0.64"
+serde_json = { version = "1.0.132", optional = true }
+
+[dev-dependencies]
+walkdir = "2.5.0"
+
+
+[features]
+default = ["serde_json"]
