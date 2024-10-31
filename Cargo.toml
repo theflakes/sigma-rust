@@ -1,7 +1,7 @@
 [package]
 name = "sigma-rust"
 description = "a library for parsing and checking Sigma rules against log events"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Dr.-Ing. Johannes Pohl <johannes.pohl90@gmail.com>"]
 categories = ["parser-implementations", "data-structures"]
