@@ -217,7 +217,8 @@ impl FieldValue {
         };
     
         // need to account for the "cased" Sigma modifier
-        reg_ex.is_match(&target.to_lowercase())
+        
+        reg_ex.is_match(&target)
     }
     
 

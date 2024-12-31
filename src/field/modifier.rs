@@ -29,12 +29,14 @@ pub enum ValueTransformer {
     Base64(Option<Utf16Modifier>),
     Base64offset(Option<Utf16Modifier>),
     Windash,
+    Cased,
 }
 
 #[derive(Debug, Default)]
 pub struct Modifier {
     pub(crate) match_all: bool,
     pub(crate) fieldref: bool,
+    pub(crate) cased: bool,
     pub(crate) match_modifier: Option<MatchModifier>,
     pub(crate) value_transformer: Option<ValueTransformer>,
 }

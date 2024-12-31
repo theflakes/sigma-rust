@@ -3,13 +3,14 @@ mod transformation;
 mod value;
 
 pub use modifier::*;
+use transformation::value_to_lowercase;
 pub use value::*;
 
 use crate::error::ParserError;
 use crate::error::ParserError::{IPParsing, InvalidYAML};
 use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
-use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
+use crate::field::ValueTransformer::{Base64, Base64offset, Windash, Cased};
 use cidr::IpCidr;
 use regex::Regex;
 use serde_yml::Value;
@@ -112,7 +113,11 @@ impl Field {
             _ => {}
         }
 
+        self.modifier.cased = false;
         match &self.modifier.value_transformer {
+            Some(Cased) => {
+                self.modifier.cased = true
+            }
             Some(Base64(utf16)) => {
                 self.values = self
                     .values
@@ -136,17 +141,28 @@ impl Field {
                     .map(FieldValue::String)
                     .collect();
             }
-            None => {}
+            None => { // no value transformers have been used, so convert everything to lower case for caseless matches
+                self.values = self
+                    .values
+                    .iter()
+                    .map(|val| FieldValue::String(value_to_lowercase(val)))
+                    .collect()
+            }
         }
 
         Ok(())
-    }
+    }    
 
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
+        let t = if !self.modifier.cased {
+            &FieldValue::String(target.value_to_string().to_lowercase())
+        } else {
+            target
+        };
         match self.modifier.match_modifier {
-            Some(MatchModifier::Contains) => target.contains(value),
-            Some(MatchModifier::StartsWith) => target.starts_with(value),
-            Some(MatchModifier::EndsWith) => target.ends_with(value),
+            Some(MatchModifier::Contains) => t.contains(value),
+            Some(MatchModifier::StartsWith) => t.starts_with(value),
+            Some(MatchModifier::EndsWith) => t.ends_with(value),
 
             Some(MatchModifier::Gt) => target > value,
             Some(MatchModifier::Gte) => target >= value,
