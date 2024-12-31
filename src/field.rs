@@ -141,15 +141,15 @@ impl Field {
                     .map(FieldValue::String)
                     .collect();
             }
-            None => {
-                if !self.modifier.cased {
-                    self.values = self
-                        .values
-                        .iter()
-                        .map(|val| FieldValue::String(value_to_lowercase(val)))
-                        .collect()
-                }
-            }
+            None => {}
+        }
+
+        if !self.modifier.cased {
+            self.values = self
+                .values
+                .iter()
+                .map(|val| FieldValue::String(value_to_lowercase(val)))
+                .collect()
         }
 
         Ok(())
