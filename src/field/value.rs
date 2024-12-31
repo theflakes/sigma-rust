@@ -1,9 +1,17 @@
-use crate::field::ParserError;
+use crate::field::{ParserError, MatchModifier};
 use cidr::IpCidr;
 use regex::Regex;
 use std::cmp::Ordering;
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+
+
+lazy_static! {
+    static ref PATTERN_CACHE: Mutex<HashMap<String, Regex>> = Mutex::new(HashMap::new());
+}
 
 #[derive(Debug)]
 pub enum FieldValue {
@@ -168,22 +176,72 @@ impl FieldValue {
         }
     }
 
+    fn pattern_to_regex_match(pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {
+        let cached_regex = {
+            let cache = PATTERN_CACHE.lock().unwrap();
+            cache.get(pattern).cloned()
+        };
+    
+        // if we've already compiled this regex then use the cached regex
+        let reg_ex = if let Some(regex) = cached_regex {
+            regex
+        } else {
+            let mut regex_pattern = String::new();
+            let mut chars = pattern.chars().peekable();
+    
+            while let Some(ch) = chars.next() {
+                match ch {
+                    '\\' => {
+                        if let Some(next_ch) = chars.peek() {
+                            regex_pattern.push('\\');
+                            regex_pattern.push(*next_ch);
+                            chars.next();
+                        }
+                    },
+                    '*' => regex_pattern.push_str(".*"),
+                    '?' => regex_pattern.push('.'),
+                    _ => regex_pattern.push_str(&regex::escape(&ch.to_string())),
+                }
+            }
+    
+            let full_pattern = match pattern_type {
+                MatchModifier::StartsWith => format!("^{}", regex_pattern),
+                MatchModifier::EndsWith => format!("{}$", regex_pattern),
+                _ => regex_pattern,
+            };
+    
+            let reg_ex = Regex::new(&full_pattern).unwrap();
+            let mut cache = PATTERN_CACHE.lock().unwrap();
+            cache.insert(pattern.to_string(), reg_ex.clone());
+            reg_ex
+        };
+    
+        // need to account for the "cased" Sigma modifier
+        reg_ex.is_match(&target.to_lowercase())
+    }
+    
+
     pub(crate) fn contains(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => a.contains(b),
+            (Self::String(a), Self::String(b)) => 
+                Self::pattern_to_regex_match(MatchModifier::Contains, b, a),
             _ => false,
         }
     }
 
     pub(crate) fn starts_with(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => a.starts_with(b),
+            (Self::String(a), Self::String(b)) => 
+                Self::pattern_to_regex_match(MatchModifier::StartsWith, b, a),
             _ => false,
         }
     }
+    
+    
     pub(crate) fn ends_with(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => a.ends_with(b),
+            (Self::String(a), Self::String(b)) => 
+                Self::pattern_to_regex_match(MatchModifier::EndsWith, b, a),
             _ => false,
         }
     }
