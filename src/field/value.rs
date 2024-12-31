@@ -216,8 +216,6 @@ impl FieldValue {
             reg_ex
         };
     
-        // need to account for the "cased" Sigma modifier
-        
         reg_ex.is_match(&target)
     }
     
