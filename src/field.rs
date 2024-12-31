@@ -141,21 +141,22 @@ impl Field {
                     .map(FieldValue::String)
                     .collect();
             }
-            None => {}
-        }
-        if !self.modifier.cased {
-            self.values = self
-                .values
-                .iter()
-                .map(|val| FieldValue::String(value_to_lowercase(val)))
-                .collect()
+            None => {
+                if !self.modifier.cased {
+                    self.values = self
+                        .values
+                        .iter()
+                        .map(|val| FieldValue::String(value_to_lowercase(val)))
+                        .collect()
+                }
+            }
         }
 
         Ok(())
     }    
 
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
-        let t = if self.modifier.cased { // was case insensitive matching specified?
+        let t = if self.modifier.cased { // was case sensitive matching specified?
             target
         } else {
             &FieldValue::String(target.value_to_string().to_lowercase())
