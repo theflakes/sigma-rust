@@ -156,9 +156,9 @@ impl FromStr for Modifier {
             }
         }
     
-        let (is_valid, base, windash_or_cased) = is_valid_transformers(&result.value_transformer);
+        let (is_valid, base, dash_or_case) = is_valid_transformers(&result.value_transformer);
         if !is_valid {
-            return Err(Self::Err::ConflictingModifiers(base, windash_or_cased));
+            return Err(Self::Err::ConflictingModifiers(base, dash_or_case));
         }
 
         if let (Some(MatchModifier::Re) | Some(MatchModifier::Cidr), Some(_)) =
