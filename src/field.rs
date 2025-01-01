@@ -114,70 +114,82 @@ impl Field {
         }
 
         self.modifier.cased = false;
-        match &self.modifier.value_transformer {
-            Some(Cased) => {
-                self.modifier.cased = true
+        for vtx in self.modifier.value_transformer.iter() {
+            match vtx {
+                Some(Cased) => {
+                    self.modifier.cased = true
+                }
+                Some(Base64(utf16)) => {
+                    self.values = self
+                        .values
+                        .iter()
+                        .map(|val| FieldValue::String(encode_base64(val, utf16)))
+                        .collect();
+                }
+                Some(Base64offset(utf16)) => {
+                    self.values = self
+                        .values
+                        .iter()
+                        .flat_map(|val| encode_base64_offset(val, utf16))
+                        .map(FieldValue::String)
+                        .collect();
+                }
+                Some(Windash) => {
+                    self.values = self
+                        .values
+                        .iter()
+                        .flat_map(windash_variations)
+                        .map(FieldValue::String)
+                        .collect();
+                }
+                None => {}
             }
-            Some(Base64(utf16)) => {
-                self.values = self
-                    .values
-                    .iter()
-                    .map(|val| FieldValue::String(encode_base64(val, utf16)))
-                    .collect();
-            }
-            Some(Base64offset(utf16)) => {
-                self.values = self
-                    .values
-                    .iter()
-                    .flat_map(|val| encode_base64_offset(val, utf16))
-                    .map(FieldValue::String)
-                    .collect();
-            }
-            Some(Windash) => {
-                self.values = self
-                    .values
-                    .iter()
-                    .flat_map(windash_variations)
-                    .map(FieldValue::String)
-                    .collect();
-            }
-            None => {}
         }
 
         if !self.modifier.cased {
-            self.values = self
-                .values
-                .iter()
-                .map(|val| FieldValue::String(value_to_lowercase(val)))
-                .collect()
-        }
+            match self.modifier.match_modifier {
+                Some(MatchModifier::Contains)
+                | Some(MatchModifier::StartsWith)
+                | Some(MatchModifier::EndsWith) => {
+                    self.values = self.values.iter()
+                        .map(|v| FieldValue::String(value_to_lowercase(v)))
+                        .collect()
+                },
+                _ => {}
+            }
+        }        
 
         Ok(())
     }    
 
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
-        let t = if self.modifier.cased { // was case sensitive matching specified?
-            target
-        } else {
-            &FieldValue::String(target.value_to_string().to_lowercase())
-        };
         match self.modifier.match_modifier {
-            Some(MatchModifier::Contains) => t.contains(value),
-            Some(MatchModifier::StartsWith) => t.starts_with(value),
-            Some(MatchModifier::EndsWith) => t.ends_with(value),
-
+            Some(MatchModifier::Contains) | 
+            Some(MatchModifier::StartsWith) | 
+            Some(MatchModifier::EndsWith) => {
+                let t = if self.modifier.cased {
+                    target
+                } else {
+                    &FieldValue::String(target.value_to_string().to_lowercase())
+                };
+                
+                match self.modifier.match_modifier {
+                    Some(MatchModifier::Contains) => t.contains(value),
+                    Some(MatchModifier::StartsWith) => t.starts_with(value),
+                    Some(MatchModifier::EndsWith) => t.ends_with(value),
+                    _ => false, // Just a fallback case
+                }
+            },
             Some(MatchModifier::Gt) => target > value,
             Some(MatchModifier::Gte) => target >= value,
             Some(MatchModifier::Lt) => target < value,
             Some(MatchModifier::Lte) => target <= value,
-
             Some(MatchModifier::Re) => value.is_regex_match(target.value_to_string().as_str()),
             Some(MatchModifier::Cidr) => value.cidr_contains(target),
-
-            // implicit equals
             None => value == target,
         }
     }
+    
 
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
         if let Some(EventValue::Value(target)) = event.get(&self.name) {
@@ -228,7 +240,7 @@ mod tests {
         let field = Field::from_str("a").unwrap();
         assert_eq!(field.name, "a");
         assert!(field.modifier.match_modifier.is_none());
-        assert!(field.modifier.value_transformer.is_none());
+        assert!(field.modifier.value_transformer.is_empty());
         assert!(!field.modifier.match_all);
     }
 
@@ -240,7 +252,7 @@ mod tests {
             field.modifier.match_modifier.unwrap(),
             MatchModifier::Contains
         );
-        assert!(field.modifier.value_transformer.is_none());
+        assert!(field.modifier.value_transformer.is_empty());
         assert!(!field.modifier.match_all);
     }
 
@@ -249,26 +261,21 @@ mod tests {
         let field = Field::from_str("hello|windash|contains").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::Contains));
-        assert_eq!(field.modifier.value_transformer, Some(Windash));
-    }
+        assert!(field.modifier.value_transformer.contains(&Some(ValueTransformer::Windash)));    }
 
     #[test]
     fn test_parse_base64_modifier() {
         let field = Field::from_str("hello|base64|endswith").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::EndsWith));
-        assert_eq!(field.modifier.value_transformer, Some(Base64(None)));
+        assert!(field.modifier.value_transformer.contains(&Some(ValueTransformer::Base64(None))));
     }
-
     #[test]
     fn test_parse_utf16_modifier() {
         let field = Field::from_str("hello|base64offset|utf16le|endswith").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::EndsWith));
-        assert_eq!(
-            field.modifier.value_transformer,
-            Some(Base64offset(Some(Utf16Modifier::Utf16le)))
-        );
+        assert!(field.modifier.value_transformer.contains(&Some(Base64offset(Some(Utf16Modifier::Utf16le)))));
     }
 
     #[test]

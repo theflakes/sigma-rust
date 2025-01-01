@@ -176,14 +176,26 @@ impl FieldValue {
         }
     }
 
-    fn pattern_to_regex_match(pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {
+    fn get_regex(pattern:&str) -> Option<Regex> {
         let cached_regex = {
             let cache = PATTERN_CACHE.lock().unwrap();
             cache.get(pattern).cloned()
         };
+        return cached_regex
+    }
+
+    fn insert_regex(pattern:&str) -> Regex {
+        let r = Regex::new(&pattern).unwrap();
+        let mut cache = PATTERN_CACHE.lock().unwrap();
+        cache.insert(pattern.to_string(), r.clone());
+        return r
+    }
+
+    fn pattern_to_regex_match(pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {
+        let cached_regex = Self::get_regex(pattern);
     
         // if we've already compiled this regex then use the cached regex
-        let reg_ex = if let Some(regex) = cached_regex {
+        let r = if let Some(regex) = cached_regex {
             regex
         } else {
             let mut regex_pattern = String::new();
@@ -210,13 +222,11 @@ impl FieldValue {
                 _ => regex_pattern,
             };
     
-            let reg_ex = Regex::new(&full_pattern).unwrap();
-            let mut cache = PATTERN_CACHE.lock().unwrap();
-            cache.insert(pattern.to_string(), reg_ex.clone());
-            reg_ex
+            let r = Self::insert_regex(&full_pattern);
+            r
         };
     
-        reg_ex.is_match(&target)
+        r.is_match(&target)
     }
     
 
@@ -235,7 +245,6 @@ impl FieldValue {
             _ => false,
         }
     }
-    
     
     pub(crate) fn ends_with(&self, other: &Self) -> bool {
         match (self, other) {
