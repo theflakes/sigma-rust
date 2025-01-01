@@ -177,11 +177,8 @@ impl FieldValue {
     }
 
     fn get_regex(pattern:&str) -> Option<Regex> {
-        let cached_regex = {
-            let cache = PATTERN_CACHE.lock().unwrap();
-            cache.get(pattern).cloned()
-        };
-        return cached_regex
+        let cache = PATTERN_CACHE.lock().unwrap();
+        cache.get(pattern).cloned()
     }
 
     fn insert_regex(pattern:&str) -> Regex {
