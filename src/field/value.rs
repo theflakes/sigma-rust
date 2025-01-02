@@ -188,6 +188,41 @@ impl FieldValue {
         return r
     }
 
+    fn convert_to_regex(pattern_type: MatchModifier, pattern: &str) -> Regex{
+        let mut regex_pattern = String::new();
+        let mut chars = pattern.chars().peekable();
+        
+        // Skip the "(?i)" for regex case insensitive search
+        if pattern.starts_with("(?i)") {
+            regex_pattern.push_str("(?i)");
+            chars.nth(3);
+        }
+        
+        while let Some(ch) = chars.next() {
+            match ch {
+                '\\' => {
+                    if let Some(next_ch) = chars.peek() {
+                        regex_pattern.push('\\');
+                        regex_pattern.push(*next_ch);
+                        chars.next();
+                    }
+                },
+                '*' => regex_pattern.push_str(".*"),
+                '?' => regex_pattern.push('.'),
+                _ => regex_pattern.push_str(&regex::escape(&ch.to_string())),
+            }
+        }
+
+        let full_pattern = match pattern_type {
+            MatchModifier::StartsWith => format!("^{}", regex_pattern),
+            MatchModifier::EndsWith => format!("{}$", regex_pattern),
+            _ => regex_pattern,
+        };
+
+        let r = Self::insert_regex(&full_pattern);
+        return r
+    }
+
     fn pattern_to_regex_match(pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {
         let cached_regex = Self::get_regex(pattern);
     
@@ -195,43 +230,11 @@ impl FieldValue {
         let r = if let Some(regex) = cached_regex {
             regex
         } else {
-            let mut regex_pattern = String::new();
-            let mut chars = pattern.chars().peekable();
-            
-            // Skip the "(?i)" for regex case insensitive search
-            if pattern.starts_with("(?i)") {
-                regex_pattern.push_str("(?i)");
-                chars.nth(3);
-            }
-            
-            while let Some(ch) = chars.next() {
-                match ch {
-                    '\\' => {
-                        if let Some(next_ch) = chars.peek() {
-                            regex_pattern.push('\\');
-                            regex_pattern.push(*next_ch);
-                            chars.next();
-                        }
-                    },
-                    '*' => regex_pattern.push_str(".*"),
-                    '?' => regex_pattern.push('.'),
-                    _ => regex_pattern.push_str(&regex::escape(&ch.to_string())),
-                }
-            }
-
-            let full_pattern = match pattern_type {
-                MatchModifier::StartsWith => format!("^{}", regex_pattern),
-                MatchModifier::EndsWith => format!("{}$", regex_pattern),
-                _ => regex_pattern,
-            };
-
-            let r = Self::insert_regex(&full_pattern);
-            r
+           Self::convert_to_regex(pattern_type, pattern)
         };
     
         r.is_match(&target)
     }
-    
 
     pub(crate) fn contains(&self, other: &Self) -> bool {
         match (self, other) {
