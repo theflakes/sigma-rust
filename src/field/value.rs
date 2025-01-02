@@ -197,7 +197,13 @@ impl FieldValue {
         } else {
             let mut regex_pattern = String::new();
             let mut chars = pattern.chars().peekable();
-    
+            
+            // Skip the "(?i)" for regex case insensitive search
+            if pattern.starts_with("(?i)") {
+                regex_pattern.push_str("(?i)");
+                chars.nth(3);
+            }
+            
             while let Some(ch) = chars.next() {
                 match ch {
                     '\\' => {
@@ -212,13 +218,13 @@ impl FieldValue {
                     _ => regex_pattern.push_str(&regex::escape(&ch.to_string())),
                 }
             }
-    
+
             let full_pattern = match pattern_type {
                 MatchModifier::StartsWith => format!("^{}", regex_pattern),
                 MatchModifier::EndsWith => format!("{}$", regex_pattern),
                 _ => regex_pattern,
             };
-    
+
             let r = Self::insert_regex(&full_pattern);
             r
         };

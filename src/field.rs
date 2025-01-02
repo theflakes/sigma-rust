@@ -3,7 +3,6 @@ mod transformation;
 mod value;
 
 pub use modifier::*;
-use transformation::value_to_lowercase;
 pub use value::*;
 
 use crate::error::ParserError;
@@ -146,19 +145,6 @@ impl Field {
             }
         }
 
-        if !self.modifier.cased {
-            match self.modifier.match_modifier {
-                Some(MatchModifier::Contains)
-                | Some(MatchModifier::StartsWith)
-                | Some(MatchModifier::EndsWith) => {
-                    self.values = self.values.iter()
-                        .map(|v| FieldValue::String(value_to_lowercase(v)))
-                        .collect()
-                },
-                _ => {}
-            }
-        }        
-
         Ok(())
     }    
 
@@ -167,16 +153,15 @@ impl Field {
             Some(MatchModifier::Contains) | 
             Some(MatchModifier::StartsWith) | 
             Some(MatchModifier::EndsWith) => {
-                let t = if self.modifier.cased {
-                    target
+                let v = if self.modifier.cased {
+                    value
                 } else {
-                    &FieldValue::String(target.value_to_string().to_lowercase())
+                    &FieldValue::String(format!("(?i){}", value.value_to_string()))
                 };
-                
                 match self.modifier.match_modifier {
-                    Some(MatchModifier::Contains) => t.contains(value),
-                    Some(MatchModifier::StartsWith) => t.starts_with(value),
-                    Some(MatchModifier::EndsWith) => t.ends_with(value),
+                    Some(MatchModifier::Contains) => target.contains(v),
+                    Some(MatchModifier::StartsWith) => target.starts_with(v),
+                    Some(MatchModifier::EndsWith) => target.ends_with(v),
                     _ => false, // Just a fallback case
                 }
             },

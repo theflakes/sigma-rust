@@ -3,9 +3,9 @@ use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use std::collections::HashMap;
 
-pub fn value_to_lowercase(input: &FieldValue) -> String {
-    return input.value_to_string().to_lowercase()
-}
+// pub fn value_to_lowercase(input: &FieldValue) -> String {
+//     return input.value_to_string().to_lowercase()
+// }
 
 pub fn encode_base64(input: &FieldValue, utf16modifier: &Option<Utf16Modifier>) -> String {
     let mut encoded = match utf16modifier {
