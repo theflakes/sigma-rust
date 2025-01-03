@@ -212,7 +212,6 @@ impl FieldValue {
                             _ => {}
                         }
                     }
-                    regex_pattern.push_str(&escape(&ch.to_string()))
                 },
                 '*' => regex_pattern.push_str(".*"),
                 '?' => regex_pattern.push('.'),
