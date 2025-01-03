@@ -203,10 +203,16 @@ impl FieldValue {
             match ch {
                 '\\' => {
                     if let Some(next_ch) = chars.peek() {
-                        regex_pattern.push('\\');
-                        regex_pattern.push(*next_ch);
-                        chars.next();
+                        match next_ch {
+                            '*' | '?' => {
+                                regex_pattern.push(ch);
+                                regex_pattern.push(*next_ch);
+                                chars.next();
+                            },
+                            _ => {}
+                        }
                     }
+                    regex_pattern.push_str(&escape(&ch.to_string()))
                 },
                 '*' => regex_pattern.push_str(".*"),
                 '?' => regex_pattern.push('.'),
