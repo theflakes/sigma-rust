@@ -77,6 +77,12 @@ impl Field {
         }
 
         match self.modifier.match_modifier {
+            Some(MatchModifier::Exists) => {
+                match bool::from_str(&self.values[0].value_to_string()) {
+                    Ok(b) => self.values[0] = FieldValue::Boolean(b),
+                    Err(err) => return Err(ParserError::ConflictingModifiers(self.values[0].value_to_string(), err.to_string())),
+                }
+            }
             Some(MatchModifier::Contains)
             | Some(MatchModifier::StartsWith)
             | Some(MatchModifier::EndsWith) => {
@@ -150,6 +156,15 @@ impl Field {
 
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
         match self.modifier.match_modifier {
+            Some(MatchModifier::Exists) => {
+                if value == &FieldValue::Boolean(true) { // field exists
+                    return true
+                } else if value == &FieldValue::Boolean(false) 
+                    && target == &FieldValue::Boolean(true) { // field|exist: false
+                    return true
+                }
+                false
+            },
             Some(MatchModifier::Contains) | 
             Some(MatchModifier::StartsWith) | 
             Some(MatchModifier::EndsWith) => {
@@ -211,6 +226,13 @@ impl Field {
             // 2. match_all = true: all conditions fired => return true
             self.modifier.match_all
         } else {
+            if self.modifier.match_modifier == Some(MatchModifier::Exists) {
+                for val in self.values.iter() {
+                    if val == &FieldValue::Boolean(false) {
+                        return true;
+                    }
+                }
+            }
             false
         }
     }

@@ -9,6 +9,7 @@ pub enum MatchModifier {
     Contains,
     StartsWith,
     EndsWith,
+    Exists,
     Gt,
     Gte,
     Lt,
@@ -107,6 +108,10 @@ impl FromStr for Modifier {
                 result.match_modifier = Some(match_modifier);
                 continue;
             }
+            match result.match_modifier {
+                Some(MatchModifier::Exists) => break,
+                _ => {}
+            }
 
             match Utf16Modifier::from_str(&s) {
                 Ok(m) => match utf16_modifier {
@@ -161,7 +166,9 @@ impl FromStr for Modifier {
             return Err(Self::Err::ConflictingModifiers(base, dash_or_case));
         }
 
-        if let (Some(MatchModifier::Re) | Some(MatchModifier::Cidr), Some(_)) =
+        if let (Some(MatchModifier::Re) 
+            | Some(MatchModifier::Cidr)
+            | Some(MatchModifier::Exists), Some(_)) =
             (&result.match_modifier, &result.value_transformer.iter().flatten().next())
         {
             return Err(Self::Err::StandaloneViolation(
