@@ -11,7 +11,8 @@ use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash, Cased};
 use cidr::IpCidr;
-use regex::Regex;
+//use regex::Regex;
+use fancy_regex::Regex;
 use serde_yml::Value;
 use std::str::FromStr;
 

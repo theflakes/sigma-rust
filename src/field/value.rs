@@ -1,6 +1,7 @@
 use crate::field::{ParserError, MatchModifier};
 use cidr::IpCidr;
-use regex::Regex;
+// use regex::Regex;
+use fancy_regex::{Regex, escape};
 use std::cmp::Ordering;
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -209,7 +210,7 @@ impl FieldValue {
                 },
                 '*' => regex_pattern.push_str(".*"),
                 '?' => regex_pattern.push('.'),
-                _ => regex_pattern.push_str(&regex::escape(&ch.to_string())),
+                _ => regex_pattern.push_str(&escape(&ch.to_string())),
             }
         }
 
@@ -233,7 +234,7 @@ impl FieldValue {
            Self::convert_to_regex(pattern_type, pattern)
         };
     
-        r.is_match(&target)
+        r.is_match(&target).unwrap()
     }
 
     pub(crate) fn contains(&self, other: &Self) -> bool {
@@ -262,7 +263,7 @@ impl FieldValue {
 
     pub(crate) fn is_regex_match(&self, target: &str) -> bool {
         match self {
-            Self::Regex(r) => r.is_match(target),
+            Self::Regex(r) => r.is_match(target).unwrap(),
             _ => false,
         }
     }

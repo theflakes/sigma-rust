@@ -19,7 +19,7 @@ pub enum ParserError {
     EmptyValues(String),
 
     #[error("Failed to parse regular expression: '{0}'")]
-    RegexParsing(regex::Error),
+    RegexParsing(fancy_regex::Error),
 
     #[error(
         "The modifier '{0}' must not be combined with other modifiers except 'all' and 'fieldref'"
