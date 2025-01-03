@@ -160,7 +160,7 @@ impl Field {
                 if value == &FieldValue::Boolean(true) { // field exists
                     return true
                 } else if value == &FieldValue::Boolean(false) 
-                    && target == &FieldValue::Boolean(true) { // field|exist: false
+                    && target == &FieldValue::Boolean(true) { // true for field|exist: false
                     return true
                 }
                 false
@@ -226,7 +226,8 @@ impl Field {
             // 2. match_all = true: all conditions fired => return true
             self.modifier.match_all
         } else {
-            if self.modifier.match_modifier == Some(MatchModifier::Exists) {
+            // we need to capture if a field we don't want to exist doesn't exist
+            if self.modifier.match_modifier == Some(MatchModifier::Exists) { 
                 for val in self.values.iter() {
                     if val == &FieldValue::Boolean(false) {
                         return true;
