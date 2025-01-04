@@ -26,7 +26,7 @@ pub struct Field {
 
 impl FromStr for Field {
     type Err = ParserError;
-    
+
     #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let result = Self {
@@ -217,7 +217,7 @@ impl Field {
             Some(MatchModifier::Re) => value.is_regex_match(target.value_to_string().as_str()),
             Some(MatchModifier::Cidr) => value.cidr_contains(target),
             None => { // do not like what I did here, but it seems to work, need to support *, ?, and cased matching
-                if self.modifier.fieldref == true {
+                if self.modifier.fieldref == true { // this is a comparison to another field in the same log
                     return value == target
                 }
                 match value {
