@@ -223,10 +223,7 @@ impl Field {
                     FieldValue::String(_) => {
                         match self.modifier.cased {
                             true => return value == target,
-                            false => {
-                                let v = &FieldValue::String(value.value_to_string().to_lowercase());
-                                return v.value_to_string() == target.value_to_string().to_lowercase()
-                            },
+                            false => return value.value_to_string().to_lowercase() == target.value_to_string().to_lowercase(),
                         };
                     }
                     _ => return value == target
