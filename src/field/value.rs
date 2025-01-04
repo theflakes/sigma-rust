@@ -27,12 +27,14 @@ pub enum FieldValue {
 }
 
 impl From<i32> for FieldValue {
+    #[inline(always)]
     fn from(i: i32) -> Self {
         Self::Int(i as i64)
     }
 }
 
 impl From<Option<i32>> for FieldValue {
+    #[inline(always)]
     fn from(option: Option<i32>) -> Self {
         match option {
             Some(i) => Self::from(i),
@@ -42,48 +44,56 @@ impl From<Option<i32>> for FieldValue {
 }
 
 impl From<i64> for FieldValue {
+    #[inline(always)]
     fn from(i: i64) -> Self {
         Self::Int(i)
     }
 }
 
 impl From<u32> for FieldValue {
+    #[inline(always)]
     fn from(u: u32) -> Self {
         Self::Unsigned(u as u64)
     }
 }
 
 impl From<u64> for FieldValue {
+    #[inline(always)]
     fn from(u: u64) -> Self {
         Self::Unsigned(u)
     }
 }
 
 impl From<f32> for FieldValue {
+    #[inline(always)]
     fn from(f: f32) -> Self {
         Self::Float(f as f64)
     }
 }
 
 impl From<f64> for FieldValue {
+    #[inline(always)]
     fn from(f: f64) -> Self {
         Self::Float(f)
     }
 }
 
 impl From<bool> for FieldValue {
+    #[inline(always)]
     fn from(b: bool) -> Self {
         Self::Boolean(b)
     }
 }
 
 impl From<String> for FieldValue {
+    #[inline(always)]
     fn from(s: String) -> Self {
         Self::String(s)
     }
 }
 
 impl From<&str> for FieldValue {
+    #[inline(always)]
     fn from(s: &str) -> Self {
         Self::String(s.to_string())
     }
@@ -93,6 +103,7 @@ impl From<&str> for FieldValue {
 impl TryFrom<serde_json::Value> for FieldValue {
     type Error = crate::error::JSONError;
 
+    #[inline(always)]
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
         match value {
             serde_json::Value::String(s) => Ok(FieldValue::from(s.to_string())),
@@ -115,6 +126,7 @@ impl TryFrom<serde_json::Value> for FieldValue {
 impl TryFrom<serde_yml::Value> for FieldValue {
     type Error = ParserError;
 
+    #[inline(always)]
     fn try_from(value: serde_yml::Value) -> Result<Self, Self::Error> {
         match value {
             serde_yml::Value::Bool(b) => Ok(Self::Boolean(b)),
@@ -135,6 +147,7 @@ impl TryFrom<serde_yml::Value> for FieldValue {
 }
 
 impl PartialEq for FieldValue {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => a.eq(b),
@@ -150,6 +163,7 @@ impl PartialEq for FieldValue {
 }
 
 impl PartialOrd for FieldValue {
+    #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
             (Self::String(a), Self::String(b)) => a.partial_cmp(b),
@@ -164,6 +178,7 @@ impl PartialOrd for FieldValue {
 }
 
 impl FieldValue {
+    #[inline(always)]
     pub(crate) fn value_to_string(&self) -> String {
         match self {
             Self::String(s) => s.to_string(),
@@ -177,11 +192,13 @@ impl FieldValue {
         }
     }
 
+    #[inline(always)]
     fn get_regex(pattern:&str) -> Option<Regex> {
         let cache = PATTERN_CACHE.lock().unwrap();
         cache.get(pattern).cloned()
     }
 
+    #[inline(always)]
     fn insert_regex(pattern:&str) -> Regex {
         let r = Regex::new(&pattern).unwrap();
         let mut cache = PATTERN_CACHE.lock().unwrap();
@@ -236,6 +253,7 @@ impl FieldValue {
         return r
     }
 
+    #[inline(always)]
     fn pattern_to_regex_match(pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {
         let cached_regex = Self::get_regex(pattern);
     
@@ -249,6 +267,7 @@ impl FieldValue {
         r.is_match(&target).unwrap()
     }
 
+    #[inline(always)]
     pub(crate) fn contains(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => 
@@ -257,6 +276,7 @@ impl FieldValue {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn starts_with(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => 
@@ -265,6 +285,7 @@ impl FieldValue {
         }
     }
     
+    #[inline(always)]
     pub(crate) fn ends_with(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => 
@@ -273,6 +294,7 @@ impl FieldValue {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn is_regex_match(&self, target: &str) -> bool {
         match self {
             Self::Regex(r) => r.is_match(target).unwrap(),
@@ -280,6 +302,7 @@ impl FieldValue {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn cidr_contains(&self, other: &Self) -> bool {
         let ip_addr = match IpAddr::from_str(other.value_to_string().as_str()) {
             Ok(ip) => ip,

@@ -30,6 +30,7 @@ pub struct Detection {
 impl TryFrom<DetectionProxy> for Detection {
     type Error = ParserError;
 
+    #[inline(always)]
     fn try_from(other: DetectionProxy) -> Result<Self, Self::Error> {
         let mut selections = HashMap::with_capacity(other.selections.len());
         for (name, selection) in other.selections {
@@ -53,14 +54,17 @@ impl TryFrom<DetectionProxy> for Detection {
 }
 
 impl Detection {
+    #[inline(always)]
     pub fn get_selections(&self) -> &HashMap<String, Selection> {
         &self.selections
     }
 
+    #[inline(always)]
     pub fn get_condition(&self) -> &str {
         &self.condition
     }
 
+    #[inline(always)]
     pub(crate) fn new<S: AsRef<str>>(
         selections: HashMap<String, Selection>,
         condition: S,
@@ -74,6 +78,7 @@ impl Detection {
         Ok(result)
     }
 
+    #[inline(always)]
     pub(crate) fn parse_ast(&mut self) -> Result<(), ParserError> {
         let ast = Ast::new(self.condition.as_str())?;
         let identifiers = ast.selections();
@@ -92,10 +97,12 @@ impl Detection {
         Ok(())
     }
 
+    #[inline(always)]
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
         self.eval(event, &self.ast, &mut HashMap::new())
     }
 
+    #[inline(always)]
     fn evaluate_selection(
         &self,
         name: &str,

@@ -26,7 +26,8 @@ pub struct Field {
 
 impl FromStr for Field {
     type Err = ParserError;
-
+    
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let result = Self {
             name: s.split("|").next().unwrap_or("").to_string(),
@@ -39,6 +40,7 @@ impl FromStr for Field {
 }
 
 impl Field {
+    #[inline(always)]
     pub(crate) fn new<S: AsRef<str>>(
         name_with_modifiers: S,
         values: Vec<FieldValue>,
@@ -55,6 +57,7 @@ impl Field {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn from_yaml<S: AsRef<str>>(name: S, value: Value) -> Result<Field, ParserError> {
         let field_values = match value {
             Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Null => {
@@ -155,6 +158,7 @@ impl Field {
         Ok(())
     }
 
+    #[inline(always)]
     fn case_compare(&self, value: &FieldValue) -> String {
         match self.modifier.cased {
             true => return value.value_to_string(),
@@ -162,6 +166,7 @@ impl Field {
         }
     }
 
+    #[inline(always)]
     fn contains_special_chars(&self, value: &FieldValue) -> bool {
         let v = value.value_to_string();
         let mut chars = v.chars().peekable();
