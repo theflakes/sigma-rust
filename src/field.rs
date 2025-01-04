@@ -237,7 +237,7 @@ impl Field {
         }
     }
     
-
+    #[inline(always)]
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
         if let Some(EventValue::Value(target)) = event.get(&self.name) {
             if self.values.is_empty() {
