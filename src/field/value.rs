@@ -198,24 +198,31 @@ impl FieldValue {
             regex_pattern.push_str("(?i)");
             chars.nth(3);
         }
+
+        let mut found_non_escape_backslash = false;
         
         while let Some(ch) = chars.next() {
             match ch {
-                '\\' => {
+                '\\' if found_non_escape_backslash == false => {
                     if let Some(next_ch) = chars.peek() {
                         match next_ch {
                             '*' | '?' => {
                                 regex_pattern.push(ch);
                                 regex_pattern.push(*next_ch);
                                 chars.next();
+                                continue;
                             },
-                            _ => {}
+                            _ => found_non_escape_backslash = true
                         }
                     }
+                    regex_pattern.push_str(&escape(&ch.to_string()));
                 },
                 '*' => regex_pattern.push_str(".*"),
                 '?' => regex_pattern.push('.'),
-                _ => regex_pattern.push_str(&escape(&ch.to_string())),
+                _ => {
+                    regex_pattern.push_str(&escape(&ch.to_string()));
+                    found_non_escape_backslash = false;
+                }
             }
         }
 

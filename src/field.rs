@@ -153,6 +153,34 @@ impl Field {
         }
 
         Ok(())
+    }
+
+    fn case_compare(&self, value: &FieldValue) -> String {
+        match self.modifier.cased {
+            true => return value.value_to_string(),
+            false => return format!("(?i){}", value.value_to_string())
+        }
+    }
+
+    fn contains_special_chars(&self, value: &FieldValue) -> bool {
+        let v = value.value_to_string();
+        let mut chars = v.chars().peekable();
+    
+        while let Some(ch) = chars.next() {
+            match ch {
+                '\\' => {
+                    // Skip the next character if it's '*' or '?'
+                    if let Some(next_ch) = chars.peek() {
+                        if *next_ch == '*' || *next_ch == '?' {
+                            chars.next();
+                        }
+                    }
+                }
+                '*' | '?' => return true,
+                _ => {}
+            }
+        }
+        false
     }    
 
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
@@ -169,11 +197,7 @@ impl Field {
             Some(MatchModifier::Contains) | 
             Some(MatchModifier::StartsWith) | 
             Some(MatchModifier::EndsWith) => {
-                let v = if self.modifier.cased {
-                    value
-                } else {
-                    &FieldValue::String(format!("(?i){}", value.value_to_string()))
-                };
+                let v= &FieldValue::String(self.case_compare(value));
                 match self.modifier.match_modifier {
                     Some(MatchModifier::Contains) => target.contains(v),
                     Some(MatchModifier::StartsWith) => target.starts_with(v),
@@ -187,7 +211,27 @@ impl Field {
             Some(MatchModifier::Lte) => target <= value,
             Some(MatchModifier::Re) => value.is_regex_match(target.value_to_string().as_str()),
             Some(MatchModifier::Cidr) => value.cidr_contains(target),
-            None => value == target,
+            None => { // do not like what I did here, but it seems to work, need to support *, ?, and cased matching
+                if self.modifier.fieldref == true {
+                    return value == target
+                }
+                match value {
+                    FieldValue::String(_) if self.contains_special_chars(value) => {
+                        let v = &FieldValue::String(self.case_compare(value));
+                        return target.contains(v)
+                    }
+                    FieldValue::String(_) => {
+                        match self.modifier.cased {
+                            true => return value == target,
+                            false => {
+                                let v = &FieldValue::String(value.value_to_string().to_lowercase());
+                                return v.value_to_string() == target.value_to_string().to_lowercase()
+                            },
+                        };
+                    }
+                    _ => return value == target
+                }
+            }
         }
     }
     

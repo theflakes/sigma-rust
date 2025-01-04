@@ -9,6 +9,7 @@ fn test_match_event_from_json() {
     let json = r#"
         {
             "Image": "C:\\rundll32.exe",
+            "Directory": "C:\\",
             "OriginalFileName": "RUNDLL32.EXE",
             "CommandLine": "hello test",
             "SomeValue": "yes"
@@ -20,6 +21,7 @@ fn test_match_event_from_json() {
         detection:
             selection:
                 Image|endswith: '\rundll32.exe'
+                Directory: 'c:\'
                 OriginalFileName: 'RUNDLL32.EXE'
             filter_main_known_extension:
                 - CommandLine|contains:
@@ -159,6 +161,7 @@ fn test_match_fieldref() {
                 User.Name.First|fieldref:
                     - User.SomeName
                     - reference
+                Image: testing
             condition: selection"#;
 
     let rule = rule_from_yaml(matching_rule).unwrap();
