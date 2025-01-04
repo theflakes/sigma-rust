@@ -192,20 +192,6 @@ impl FieldValue {
         }
     }
 
-    #[inline(always)]
-    fn get_regex(pattern:&str) -> Option<Regex> {
-        let cache = PATTERN_CACHE.lock().unwrap();
-        cache.get(pattern).cloned()
-    }
-
-    #[inline(always)]
-    fn insert_regex(pattern:&str) -> Regex {
-        let r = Regex::new(&pattern).unwrap();
-        let mut cache = PATTERN_CACHE.lock().unwrap();
-        cache.insert(pattern.to_string(), r.clone());
-        return r
-    }
-
     fn convert_to_regex(pattern_type: MatchModifier, pattern: &str) -> Regex{
         let mut regex_pattern = String::new();
         let mut chars = pattern.chars().peekable();
@@ -250,6 +236,20 @@ impl FieldValue {
         };
 
         let r = Self::insert_regex(&full_pattern);
+        return r
+    }
+
+    #[inline(always)]
+    fn get_regex(pattern:&str) -> Option<Regex> {
+        let cache = PATTERN_CACHE.lock().unwrap();
+        cache.get(pattern).cloned()
+    }
+
+    #[inline(always)]
+    fn insert_regex(pattern:&str) -> Regex {
+        let r = Regex::new(&pattern).unwrap();
+        let mut cache = PATTERN_CACHE.lock().unwrap();
+        cache.insert(pattern.to_string(), r.clone());
         return r
     }
 

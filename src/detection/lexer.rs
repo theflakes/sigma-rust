@@ -47,7 +47,6 @@ impl Display for Quantifier {
         }
     }
 }
-
 pub(crate) struct Lexer {
     tokens: Vec<Token>,
 }
@@ -59,9 +58,11 @@ impl Lexer {
         Self { tokens }
     }
 
+    #[inline(always)]
     pub(crate) fn next(&mut self) -> Token {
         self.tokens.pop().unwrap_or(Token::End)
     }
+    #[inline(always)]
     pub(crate) fn peek(&mut self) -> Token {
         self.tokens.last().cloned().unwrap_or(Token::End)
     }
