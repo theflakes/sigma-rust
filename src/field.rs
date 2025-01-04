@@ -169,9 +169,9 @@ impl Field {
         while let Some(ch) = chars.next() {
             match ch {
                 '\\' => {
-                    // Skip the next character if it's '*' or '?'
+                    // Skip the next character if it's: '*' , '?', '/'
                     if let Some(next_ch) = chars.peek() {
-                        if *next_ch == '*' || *next_ch == '?' {
+                        if *next_ch == '*' || *next_ch == '?' || *next_ch == '\\' {
                             chars.next();
                         }
                     }
