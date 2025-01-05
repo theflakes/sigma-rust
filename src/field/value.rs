@@ -356,8 +356,8 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    pub(crate) fn is_equal(&self, target: &Self, cased: bool) -> bool {
-        match (self, target) {
+    pub(crate) fn is_equal(&self, other: &Self, cased: bool) -> bool {
+        match (self, other) {
             (Self::String(a), Self::String(b)) => {
                 if self.contains_unescaped_wildcards(b) {
                     let v = self.case_compare(b, cased);
@@ -369,7 +369,7 @@ impl FieldValue {
                     return a.to_lowercase() == b.to_lowercase()
                 }
             }
-            _ => self == target,
+            _ => self == other,
         }
     }
 
