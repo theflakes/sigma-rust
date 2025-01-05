@@ -6,13 +6,12 @@ use std::cmp::Ordering;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::collections::HashMap;
-use std::sync::Mutex;
-use lazy_static::lazy_static;
+//use std::sync::RwLock;
+//use lazy_static::lazy_static;
+use static_init::dynamic;
 
-
-lazy_static! {
-    static ref PATTERN_CACHE: Mutex<HashMap<String, Regex>> = Mutex::new(HashMap::new());
-}
+#[dynamic] 
+static mut PATTERN_CACHE: HashMap<String, Regex> = HashMap::new();
 
 #[derive(Debug)]
 pub enum FieldValue {
@@ -192,7 +191,8 @@ impl FieldValue {
         }
     }
 
-    fn convert_to_regex(pattern_type: MatchModifier, pattern: &str) -> Regex{
+    #[inline(always)]
+    fn convert_to_regex(&self, pattern_type: MatchModifier, pattern: &str) -> Regex {
         let mut regex_pattern = String::new();
         let mut chars = pattern.chars().peekable();
         
@@ -232,65 +232,144 @@ impl FieldValue {
         let full_pattern = match pattern_type {
             MatchModifier::StartsWith => format!("^{}", regex_pattern),
             MatchModifier::EndsWith => format!("{}$", regex_pattern),
-            _ => regex_pattern,
+            _ => format!("^{}$", regex_pattern),
         };
 
-        let r = Self::insert_regex(&full_pattern);
+        let r = self.insert_regex(pattern, &full_pattern);
         return r
     }
 
     #[inline(always)]
-    fn get_regex(pattern:&str) -> Option<Regex> {
-        let cache = PATTERN_CACHE.lock().unwrap();
-        cache.get(pattern).cloned()
+    fn get_regex(&self, pattern:&str) -> Option<Regex> {
+        let cache = PATTERN_CACHE.read();
+        match cache.get(pattern) {
+            Some(r) => Some(r.clone()),
+            None => None,
+        }
     }
 
     #[inline(always)]
-    fn insert_regex(pattern:&str) -> Regex {
-        let r = Regex::new(&pattern).unwrap();
-        let mut cache = PATTERN_CACHE.lock().unwrap();
+    fn insert_regex(&self, pattern: &str, full_pattern:&str) -> Regex {
+        let r = Regex::new(&full_pattern).unwrap();
+        let mut cache = PATTERN_CACHE.write();
         cache.insert(pattern.to_string(), r.clone());
         return r
     }
 
     #[inline(always)]
-    fn pattern_to_regex_match(pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {
-        let cached_regex = Self::get_regex(pattern);
-    
+    fn pattern_to_regex_match(&self, pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {    
         // if we've already compiled this regex then use the cached regex
-        let r = if let Some(regex) = cached_regex {
+        let r: Regex = if let Some(regex) = self.get_regex(pattern) {
             regex
         } else {
-           Self::convert_to_regex(pattern_type, pattern)
+           self.convert_to_regex(pattern_type, pattern)
         };
     
         r.is_match(&target).unwrap()
     }
 
+    // #[inline(always)]
+    // fn contains_unescaped_wildcards(&self, s: &str) -> bool {
+    //     s.chars().any(|c| c == '*' || c == '?')
+    // }
     #[inline(always)]
-    pub(crate) fn contains(&self, other: &Self) -> bool {
+    fn contains_unescaped_wildcards(&self, value: &str) -> bool {
+        let mut chars = value.chars().peekable();
+    
+        while let Some(ch) = chars.next() {
+            match ch {
+                '\\' => {
+                    // Skip the next character if it's: '*' , '?', '/'
+                    if let Some(next_ch) = chars.peek() {
+                        if *next_ch == '*' || *next_ch == '?' || *next_ch == '\\' {
+                            chars.next();
+                        }
+                    }
+                }
+                '*' | '?' => return true,
+                _ => {}
+            }
+        }
+        false
+    }   
+
+    #[inline(always)]
+    fn case_compare(&self, value: &str, cased: bool) -> String {
+        match cased {
+            true => return value.to_string(),
+            false => return format!("(?i){}", value.to_string())
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn contains(&self, other: &Self, cased: bool) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => 
-                Self::pattern_to_regex_match(MatchModifier::Contains, b, a),
+            (Self::String(a), Self::String(b)) => {
+                if self.contains_unescaped_wildcards(b) {
+                    let v = self.case_compare(b, cased);
+                    self.pattern_to_regex_match(MatchModifier::Contains, &v, a)
+                } else {
+                    if cased {
+                        return a.contains(b)
+                    }
+                    return a.to_lowercase().contains(&b.to_lowercase())
+                }
+            }
             _ => false,
         }
     }
 
     #[inline(always)]
-    pub(crate) fn starts_with(&self, other: &Self) -> bool {
+    pub(crate) fn starts_with(&self, other: &Self, cased: bool) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => 
-                Self::pattern_to_regex_match(MatchModifier::StartsWith, b, a),
+            (Self::String(a), Self::String(b)) => {
+                if self.contains_unescaped_wildcards(b) {
+                    let v = Self::case_compare(&self, b, cased);
+                    self.pattern_to_regex_match( MatchModifier::StartsWith, &v, a)
+                } else {
+                    if cased {
+                        return a.starts_with(b)
+                    }
+                    return a.to_lowercase().starts_with(&b.to_lowercase())
+                }
+            }
             _ => false,
         }
     }
     
     #[inline(always)]
-    pub(crate) fn ends_with(&self, other: &Self) -> bool {
+    pub(crate) fn ends_with(&self, other: &Self, cased: bool) -> bool {
         match (self, other) {
-            (Self::String(a), Self::String(b)) => 
-                Self::pattern_to_regex_match(MatchModifier::EndsWith, b, a),
+            (Self::String(a), Self::String(b)) => {
+                if self.contains_unescaped_wildcards(b) {
+                    let v = Self::case_compare(&self, b, cased);
+                    self.pattern_to_regex_match(MatchModifier::EndsWith, &v, a)
+                } else {
+                    if cased {
+                        return a.ends_with(b)
+                    }
+                    return a.to_lowercase().ends_with(&b.to_lowercase())
+                }
+            }
             _ => false,
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_equal(&self, target: &Self, cased: bool) -> bool {
+        match (self, target) {
+            (Self::String(a), Self::String(b)) => {
+                if self.contains_unescaped_wildcards(b) {
+                    let v = self.case_compare(b, cased);
+                    self.pattern_to_regex_match(MatchModifier::Contains, &v, a)
+                } else {
+                    if cased {
+                        return a == b
+                    }
+                    return a.to_lowercase() == b.to_lowercase()
+                }
+            }
+            _ => self == target,
         }
     }
 
@@ -314,6 +393,45 @@ impl FieldValue {
             _ => false,
         }
     }
+
+    // pub(crate) fn contains(&self, other: &Self) -> bool {
+    //     match (self, other) {
+    //         (Self::String(a), Self::String(b)) => a.contains(b),
+    //         _ => false,
+    //     }
+    // }
+
+    // pub(crate) fn starts_with(&self, other: &Self) -> bool {
+    //     match (self, other) {
+    //         (Self::String(a), Self::String(b)) => a.starts_with(b),
+    //         _ => false,
+    //     }
+    // }
+    // pub(crate) fn ends_with(&self, other: &Self) -> bool {
+    //     match (self, other) {
+    //         (Self::String(a), Self::String(b)) => a.ends_with(b),
+    //         _ => false,
+    //     }
+    // }
+
+    // pub(crate) fn is_regex_match(&self, target: &str) -> bool {
+    //     match self {
+    //         Self::Regex(r) => r.is_match(target).unwrap(),
+    //         _ => false,
+    //     }
+    // }
+
+    // pub(crate) fn cidr_contains(&self, other: &Self) -> bool {
+    //     let ip_addr = match IpAddr::from_str(other.value_to_string().as_str()) {
+    //         Ok(ip) => ip,
+    //         Err(_) => return false,
+    //     };
+
+    //     match self {
+    //         Self::Cidr(cidr) => cidr.contains(&ip_addr),
+    //         _ => false,
+    //     }
+    // }
 }
 
 #[cfg(test)]

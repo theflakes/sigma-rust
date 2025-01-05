@@ -11,7 +11,7 @@ use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash, Cased};
 use cidr::IpCidr;
-//use regex::Regex;
+// use regex::Regex;
 use fancy_regex::Regex;
 use serde_yml::Value;
 use std::str::FromStr;
@@ -156,38 +156,9 @@ impl Field {
         }
 
         Ok(())
-    }
+    } 
 
     #[inline(always)]
-    fn case_compare(&self, value: &FieldValue) -> String {
-        match self.modifier.cased {
-            true => return value.value_to_string(),
-            false => return format!("(?i){}", value.value_to_string())
-        }
-    }
-
-    #[inline(always)]
-    fn contains_special_chars(&self, value: &FieldValue) -> bool {
-        let v = value.value_to_string();
-        let mut chars = v.chars().peekable();
-    
-        while let Some(ch) = chars.next() {
-            match ch {
-                '\\' => {
-                    // Skip the next character if it's: '*' , '?', '/'
-                    if let Some(next_ch) = chars.peek() {
-                        if *next_ch == '*' || *next_ch == '?' || *next_ch == '\\' {
-                            chars.next();
-                        }
-                    }
-                }
-                '*' | '?' => return true,
-                _ => {}
-            }
-        }
-        false
-    }    
-
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
         match self.modifier.match_modifier {
             Some(MatchModifier::Exists) => {
@@ -199,17 +170,9 @@ impl Field {
                 }
                 false
             },
-            Some(MatchModifier::Contains) | 
-            Some(MatchModifier::StartsWith) | 
-            Some(MatchModifier::EndsWith) => {
-                let v= &FieldValue::String(self.case_compare(value));
-                match self.modifier.match_modifier {
-                    Some(MatchModifier::Contains) => target.contains(v),
-                    Some(MatchModifier::StartsWith) => target.starts_with(v),
-                    Some(MatchModifier::EndsWith) => target.ends_with(v),
-                    _ => false, // Just a fallback case
-                }
-            },
+            Some(MatchModifier::Contains) => target.contains(value, self.modifier.cased),
+            Some(MatchModifier::StartsWith) => target.starts_with(value, self.modifier.cased),
+            Some(MatchModifier::EndsWith) => target.ends_with(value, self.modifier.cased),
             Some(MatchModifier::Gt) => target > value,
             Some(MatchModifier::Gte) => target >= value,
             Some(MatchModifier::Lt) => target < value,
@@ -220,19 +183,7 @@ impl Field {
                 if self.modifier.fieldref == true { // this is a comparison to another field in the same log
                     return value == target
                 }
-                match value {
-                    FieldValue::String(_) if self.contains_special_chars(value) => {
-                        let v = &FieldValue::String(self.case_compare(value));
-                        return target.contains(v)
-                    }
-                    FieldValue::String(_) => {
-                        match self.modifier.cased {
-                            true => return value == target,
-                            false => return value.value_to_string().to_lowercase() == target.value_to_string().to_lowercase(),
-                        };
-                    }
-                    _ => return value == target
-                }
+                return target.is_equal(value, self.modifier.cased)
             }
         }
     }
@@ -335,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_equals() {
-        let field = Field::new(
+        let mut field = Field::new(
             "test",
             vec![
                 FieldValue::from("zsh"),
@@ -344,6 +295,7 @@ mod tests {
             ],
         )
         .unwrap();
+        field.modifier.cased = true;
         let event_no_match = Event::from([("test", "zsh shutdown")]);
         assert!(!field.evaluate(&event_no_match));
         let matching_event = Event::from([("test", "bash")]);

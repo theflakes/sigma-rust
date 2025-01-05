@@ -1,3 +1,5 @@
+// use regex::Regex;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ParserError {
     #[error("The field modifiers '{0}' and '{1}' are conflicting")]
@@ -20,6 +22,7 @@ pub enum ParserError {
 
     #[error("Failed to parse regular expression: '{0}'")]
     RegexParsing(fancy_regex::Error),
+    // RegexParsing(regex::Error),
 
     #[error(
         "The modifier '{0}' must not be combined with other modifiers except 'all' and 'fieldref'"

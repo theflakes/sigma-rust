@@ -21,7 +21,7 @@ serde_yml = "0.0.12"
 strum = { version = "0.26.3", features = ["derive"] }
 thiserror = "1.0.64"
 serde_json = { version = "1.0.132", optional = true }
-lazy_static = "*"
+static_init = "*"
 
 [dev-dependencies]
 walkdir = "2.5.0"
