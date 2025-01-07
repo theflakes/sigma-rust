@@ -230,6 +230,7 @@ impl FieldValue {
         }
 
         let full_pattern = match pattern_type {
+            MatchModifier::Contains => regex_pattern,
             MatchModifier::StartsWith => format!("^{}", regex_pattern),
             MatchModifier::EndsWith => format!("{}$", regex_pattern),
             _ => format!("^{}$", regex_pattern),
@@ -261,6 +262,7 @@ impl FieldValue {
         let r = Regex::new(&full_pattern).unwrap();
         let mut cache = PATTERN_CACHE.write();
         cache.insert(pattern.to_string(), r.clone());
+        println!("{:?}", cache.len());
         return r
     }
 
@@ -307,6 +309,7 @@ impl FieldValue {
 
     #[inline(always)]
     pub(crate) fn contains(&self, other: &Self, cased: bool) -> bool {
+        
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
                 if self.contains_unescaped_wildcards(b) {
