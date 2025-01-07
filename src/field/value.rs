@@ -262,7 +262,6 @@ impl FieldValue {
         let r = Regex::new(&full_pattern).unwrap();
         let mut cache = PATTERN_CACHE.write();
         cache.insert(pattern.to_string(), r.clone());
-        println!("{:?}", cache.len());
         return r
     }
 
