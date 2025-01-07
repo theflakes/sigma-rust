@@ -192,7 +192,7 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    fn convert_to_regex(&self, pattern_type: MatchModifier, pattern: &str) -> Regex {
+    fn convert_to_regex(&self, pattern_type: MatchModifier, pattern: &str, cased: bool) -> Regex {
         let mut regex_pattern = String::new();
         let mut chars = pattern.chars().peekable();
         
@@ -234,9 +234,17 @@ impl FieldValue {
             MatchModifier::EndsWith => format!("{}$", regex_pattern),
             _ => format!("^{}$", regex_pattern),
         };
+        
+        let regex = self.case_compare(&full_pattern, cased);
+        self.insert_regex(pattern, &regex)
+    }
 
-        let r = self.insert_regex(pattern, &full_pattern);
-        return r
+    #[inline(always)]
+    fn case_compare(&self, regex: &str, cased: bool) -> String {
+        match cased {
+            true => return regex.to_string(),
+            _ => return format!("(?i){}", regex.to_string())
+        }
     }
 
     #[inline(always)]
@@ -257,14 +265,18 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    fn pattern_to_regex_match(&self, pattern_type: MatchModifier, pattern: &str, target: &str) -> bool {    
+    fn pattern_to_regex_match(&self, 
+            pattern_type: MatchModifier, 
+            pattern: &str, 
+            target: &str,
+            cased: bool) -> bool 
+    {    
         // if we've already compiled this regex then use the cached regex
         let r: Regex = if let Some(regex) = self.get_regex(pattern) {
             regex
         } else {
-           self.convert_to_regex(pattern_type, pattern)
+           self.convert_to_regex(pattern_type, pattern, cased)
         };
-    
         r.is_match(&target).unwrap()
     }
 
@@ -291,14 +303,6 @@ impl FieldValue {
             }
         }
         false
-    }   
-
-    #[inline(always)]
-    fn case_compare(&self, value: &str, cased: bool) -> String {
-        match cased {
-            true => return value.to_string(),
-            false => return format!("(?i){}", value.to_string())
-        }
     }
 
     #[inline(always)]
@@ -306,8 +310,7 @@ impl FieldValue {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
                 if self.contains_unescaped_wildcards(b) {
-                    let v = self.case_compare(b, cased);
-                    self.pattern_to_regex_match(MatchModifier::Contains, &v, a)
+                    self.pattern_to_regex_match(MatchModifier::Contains, &b, a, cased)
                 } else {
                     if cased {
                         return a.contains(b)
@@ -324,8 +327,7 @@ impl FieldValue {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
                 if self.contains_unescaped_wildcards(b) {
-                    let v = Self::case_compare(&self, b, cased);
-                    self.pattern_to_regex_match( MatchModifier::StartsWith, &v, a)
+                    self.pattern_to_regex_match( MatchModifier::StartsWith, &b, a, cased)
                 } else {
                     if cased {
                         return a.starts_with(b)
@@ -342,8 +344,7 @@ impl FieldValue {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
                 if self.contains_unescaped_wildcards(b) {
-                    let v = Self::case_compare(&self, b, cased);
-                    self.pattern_to_regex_match(MatchModifier::EndsWith, &v, a)
+                    self.pattern_to_regex_match(MatchModifier::EndsWith, &b, a, cased)
                 } else {
                     if cased {
                         return a.ends_with(b)
@@ -360,8 +361,7 @@ impl FieldValue {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
                 if self.contains_unescaped_wildcards(b) {
-                    let v = self.case_compare(b, cased);
-                    self.pattern_to_regex_match(MatchModifier::Contains, &v, a)
+                    self.pattern_to_regex_match(MatchModifier::Contains, &b, a, cased)
                 } else {
                     if cased {
                         return a == b

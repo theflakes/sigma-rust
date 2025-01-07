@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_equals() {
-        let mut field = Field::new(
+        let field = Field::new(
             "test",
             vec![
                 FieldValue::from("zsh"),
@@ -295,12 +295,48 @@ mod tests {
             ],
         )
         .unwrap();
-        field.modifier.cased = true;
         let event_no_match = Event::from([("test", "zsh shutdown")]);
         assert!(!field.evaluate(&event_no_match));
         let matching_event = Event::from([("test", "bash")]);
         assert!(field.evaluate(&matching_event));
     }
+
+    #[test]
+    fn test_evaluate_cased() {
+        let mut field = Field::new(
+            "test",
+            vec![
+                FieldValue::from("zsh"),
+                FieldValue::from("BASH"),
+                FieldValue::from("pwsh"),
+            ],
+        )
+        .unwrap();
+        field.modifier.cased = true;
+        let event_no_match = Event::from([("test", "bash")]);
+        assert!(!field.evaluate(&event_no_match));
+        let matching_event = Event::from([("test", "BASH")]);
+        assert!(field.evaluate(&matching_event));
+        field.modifier.cased = false;
+        let matching_event = Event::from([("test", "BASH")]);
+        assert!(field.evaluate(&matching_event));
+    }#[test]
+
+    fn test_evaluate_wildcards() {
+        let mut field = Field::new(
+            "test",
+            vec![
+                FieldValue::from("*is*"),
+                FieldValue::from("wha? *"),
+            ],
+        )
+        .unwrap();
+        field.modifier.cased = true;
+        let event_no_match = Event::from([("test", "where IS evil")]);
+        assert!(!field.evaluate(&event_no_match));
+        let matching_event = Event::from([("test", "what are these")]);
+        assert!(field.evaluate(&matching_event));
+    } 
 
     #[test]
     fn test_evaluate_startswith() {
