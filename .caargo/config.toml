@@ -1,0 +1,16 @@
+#
+# Statically Link so that C++ runtime is not required for running the binary
+#
+# needed for gxhash
+#-C target-cpu=native" or RUSTFLAGS="-C target-feature=+aes,+sse2
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "target-feature=+crt-static", "-Aunused", "-C", "target-cpu=native"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static", "-Aunused", "-C", "target-cpu=native"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static", "-Aunused", "-C", "target-cpu=native"]
+
+[target.'cfg(target_os = "linux")']
+rustflags = ["-Aunused", "-C", "relocation-model=static", "-C", "strip=symbols", "-C", "target-cpu=native"]
