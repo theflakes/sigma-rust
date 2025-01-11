@@ -6,6 +6,8 @@ Changes I've made:
 - Added `cased` field modifier
 - Added `exists` modifier
 - Added simple glob matching; i.e. `*` and `?`
+  
+This is used in my Sigma command line rule tester: https://github.com/theflakes/sigma_rule_tester
 
 # sigma-rust
 
