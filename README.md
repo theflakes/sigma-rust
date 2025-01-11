@@ -1,3 +1,11 @@
+### Misc.
+Many thanks to Dr.-Ing. Johannes Pohl for authoring this crate.  
+Changes I've made:
+- Switched to `fancy-regex` crate to support lookarounds
+- Added `cased` field modifier
+- Added `exists` modifier
+- Added simple glob matching; i.e. `*` and `?`
+
 # sigma-rust
 
 ![Build](https://github.com/jopohl/sigma-rust/actions/workflows/ci.yml/badge.svg)
