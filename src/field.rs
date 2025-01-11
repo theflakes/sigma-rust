@@ -11,9 +11,10 @@ use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash, Cased};
 use cidr::IpCidr;
-// use regex::Regex;
-use fancy_regex::Regex;
+use fancy_regex::Regex; // supports lookarounds
 use serde_yml::Value;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 // https://sigmahq.io/docs/basics/modifiers.html
@@ -21,6 +22,7 @@ use std::str::FromStr;
 pub struct Field {
     pub name: String,
     pub values: Vec<FieldValue>,
+    pub regexes: RefCell<HashMap<String, Regex>>, // cache any patterns with globs (*, ?) converted to regex
     pub(crate) modifier: Modifier,
 }
 
@@ -32,6 +34,7 @@ impl FromStr for Field {
         let result = Self {
             name: s.split("|").next().unwrap_or("").to_string(),
             values: vec![],
+            regexes: RefCell::new(HashMap::new()),
             modifier: Modifier::from_str(s)?,
         };
 
@@ -75,6 +78,7 @@ impl Field {
         Self::new(name, field_values)
     }
 
+    #[inline(always)]
     fn bootstrap(&mut self) -> Result<(), ParserError> {
         if self.values.is_empty() {
             return Err(ParserError::EmptyValues(self.name.to_string()));
@@ -165,25 +169,25 @@ impl Field {
                 if value == &FieldValue::Boolean(true) { // field exists
                     return true
                 } else if value == &FieldValue::Boolean(false) 
-                    && target == &FieldValue::Boolean(true) { // true for field|exist: false
+                  && target == &FieldValue::Boolean(true) { // true for field|exist: false
                     return true
                 }
                 false
             },
-            Some(MatchModifier::Contains) => target.contains(value, self.modifier.cased),
-            Some(MatchModifier::StartsWith) => target.starts_with(value, self.modifier.cased),
-            Some(MatchModifier::EndsWith) => target.ends_with(value, self.modifier.cased),
+            Some(MatchModifier::Contains) => target.contains(value, self.modifier.cased, &mut self.regexes.borrow_mut()),
+            Some(MatchModifier::StartsWith) => target.starts_with(value, self.modifier.cased, &mut self.regexes.borrow_mut()),
+            Some(MatchModifier::EndsWith) => target.ends_with(value, self.modifier.cased, &mut self.regexes.borrow_mut()),
             Some(MatchModifier::Gt) => target > value,
             Some(MatchModifier::Gte) => target >= value,
             Some(MatchModifier::Lt) => target < value,
             Some(MatchModifier::Lte) => target <= value,
             Some(MatchModifier::Re) => value.is_regex_match(target.value_to_string().as_str()),
             Some(MatchModifier::Cidr) => value.cidr_contains(target),
-            None => { // do not like what I did here, but it seems to work, need to support *, ?, and cased matching
+            None => {
                 if self.modifier.fieldref == true { // this is a comparison to another field in the same log
                     return value == target
                 }
-                return target.is_equal(value, self.modifier.cased)
+                return target.is_equal(value, self.modifier.cased, &mut self.regexes.borrow_mut())
             }
         }
     }
@@ -475,6 +479,7 @@ mod tests {
         let mut field = Field {
             name: "test".to_string(),
             values: vec![],
+            regexes: RefCell::new(HashMap::new()),
             modifier: Modifier::default(),
         };
 

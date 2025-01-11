@@ -6,12 +6,6 @@ use std::cmp::Ordering;
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::collections::HashMap;
-//use std::sync::RwLock;
-//use lazy_static::lazy_static;
-use static_init::dynamic;
-
-#[dynamic] 
-static mut PATTERN_CACHE: HashMap<String, Regex> = HashMap::new();
 
 #[derive(Debug)]
 pub enum FieldValue {
@@ -192,7 +186,7 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    fn convert_to_regex(&self, pattern_type: MatchModifier, pattern: &str, cased: bool) -> Regex {
+    pub fn convert_to_regex(&self, pattern_type: MatchModifier, pattern: &str, cased: bool) -> Regex {
         let mut regex_pattern = String::new();
         let mut chars = pattern.chars().peekable();
         
@@ -237,7 +231,7 @@ impl FieldValue {
         };
         
         let regex = self.case_compare(&full_pattern, cased);
-        self.insert_regex(pattern, &regex)
+        Regex::new(&regex).unwrap()
     }
 
     #[inline(always)]
@@ -249,46 +243,8 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    fn get_regex(&self, pattern:&str) -> Option<Regex> {
-        let cache = PATTERN_CACHE.read();
-        match cache.get(pattern) {
-            Some(r) => Some(r.clone()),
-            None => None,
-        }
-    }
-
-    #[inline(always)]
-    fn insert_regex(&self, pattern: &str, full_pattern:&str) -> Regex {
-        let r = Regex::new(&full_pattern).unwrap();
-        let mut cache = PATTERN_CACHE.write();
-        cache.insert(pattern.to_string(), r.clone());
-        return r
-    }
-
-    #[inline(always)]
-    fn pattern_to_regex_match(&self, 
-            pattern_type: MatchModifier, 
-            pattern: &str, 
-            target: &str,
-            cased: bool) -> bool 
-    {    
-        // if we've already compiled this regex then use the cached regex
-        let r: Regex = if let Some(regex) = self.get_regex(pattern) {
-            regex
-        } else {
-           self.convert_to_regex(pattern_type, pattern, cased)
-        };
-        r.is_match(&target).unwrap()
-    }
-
-    // #[inline(always)]
-    // fn contains_unescaped_wildcards(&self, s: &str) -> bool {
-    //     s.chars().any(|c| c == '*' || c == '?')
-    // }
-    #[inline(always)]
-    fn contains_unescaped_wildcards(&self, value: &str) -> bool {
+    pub fn contains_unescaped_wildcards(&self, value: &str) -> bool {
         let mut chars = value.chars().peekable();
-    
         while let Some(ch) = chars.next() {
             match ch {
                 '\\' => {
@@ -307,12 +263,16 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    pub(crate) fn contains(&self, other: &Self, cased: bool) -> bool {
-        
+    pub(crate) fn contains(&self, other: &Self, cased: bool, regexes: &mut HashMap<String, Regex>) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
+                if let Some(r) = regexes.get(b) {
+                    return r.is_match(a).unwrap();
+                }
                 if self.contains_unescaped_wildcards(b) {
-                    self.pattern_to_regex_match(MatchModifier::Contains, &b, a, cased)
+                    let r = self.convert_to_regex(MatchModifier::Contains, &b, cased);
+                    regexes.insert(b.to_string(), r.clone());
+                    r.is_match(a).unwrap()
                 } else {
                     if cased {
                         return a.contains(b)
@@ -325,11 +285,16 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    pub(crate) fn starts_with(&self, other: &Self, cased: bool) -> bool {
+    pub(crate) fn starts_with(&self, other: &Self, cased: bool, regexes: &mut HashMap<String, Regex>) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
+                if let Some(r) = regexes.get(b) {
+                    return r.is_match(a).unwrap();
+                }
                 if self.contains_unescaped_wildcards(b) {
-                    self.pattern_to_regex_match( MatchModifier::StartsWith, &b, a, cased)
+                    let r = self.convert_to_regex(MatchModifier::StartsWith, &b, cased);
+                    regexes.insert(b.to_string(), r.clone());
+                    r.is_match(a).unwrap()
                 } else {
                     if cased {
                         return a.starts_with(b)
@@ -342,11 +307,16 @@ impl FieldValue {
     }
     
     #[inline(always)]
-    pub(crate) fn ends_with(&self, other: &Self, cased: bool) -> bool {
+    pub(crate) fn ends_with(&self, other: &Self, cased: bool, regexes: &mut HashMap<String, Regex>) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
+                if let Some(r) = regexes.get(b) {
+                    return r.is_match(a).unwrap();
+                }
                 if self.contains_unescaped_wildcards(b) {
-                    self.pattern_to_regex_match(MatchModifier::EndsWith, &b, a, cased)
+                    let r = self.convert_to_regex(MatchModifier::EndsWith, &b, cased);
+                    regexes.insert(b.to_string(), r.clone());
+                    r.is_match(a).unwrap()
                 } else {
                     if cased {
                         return a.ends_with(b)
@@ -359,11 +329,16 @@ impl FieldValue {
     }
 
     #[inline(always)]
-    pub(crate) fn is_equal(&self, other: &Self, cased: bool) -> bool {
+    pub(crate) fn is_equal(&self, other: &Self, cased: bool, regexes: &mut HashMap<String, Regex>) -> bool {
         match (self, other) {
             (Self::String(a), Self::String(b)) => {
+                if let Some(r) = regexes.get(b) {
+                    return r.is_match(a).unwrap();
+                }
                 if self.contains_unescaped_wildcards(b) {
-                    self.pattern_to_regex_match(MatchModifier::Contains, &b, a, cased)
+                    let r = self.convert_to_regex(MatchModifier::Contains, &b, cased);
+                    regexes.insert(b.to_string(), r.clone());
+                    r.is_match(a).unwrap()
                 } else {
                     if cased {
                         return a == b
@@ -395,45 +370,6 @@ impl FieldValue {
             _ => false,
         }
     }
-
-    // pub(crate) fn contains(&self, other: &Self) -> bool {
-    //     match (self, other) {
-    //         (Self::String(a), Self::String(b)) => a.contains(b),
-    //         _ => false,
-    //     }
-    // }
-
-    // pub(crate) fn starts_with(&self, other: &Self) -> bool {
-    //     match (self, other) {
-    //         (Self::String(a), Self::String(b)) => a.starts_with(b),
-    //         _ => false,
-    //     }
-    // }
-    // pub(crate) fn ends_with(&self, other: &Self) -> bool {
-    //     match (self, other) {
-    //         (Self::String(a), Self::String(b)) => a.ends_with(b),
-    //         _ => false,
-    //     }
-    // }
-
-    // pub(crate) fn is_regex_match(&self, target: &str) -> bool {
-    //     match self {
-    //         Self::Regex(r) => r.is_match(target).unwrap(),
-    //         _ => false,
-    //     }
-    // }
-
-    // pub(crate) fn cidr_contains(&self, other: &Self) -> bool {
-    //     let ip_addr = match IpAddr::from_str(other.value_to_string().as_str()) {
-    //         Ok(ip) => ip,
-    //         Err(_) => return false,
-    //     };
-
-    //     match self {
-    //         Self::Cidr(cidr) => cidr.contains(&ip_addr),
-    //         _ => false,
-    //     }
-    // }
 }
 
 #[cfg(test)]
