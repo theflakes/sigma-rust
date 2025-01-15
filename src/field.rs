@@ -324,8 +324,39 @@ mod tests {
         field.modifier.cased = false;
         let matching_event = Event::from([("test", "BASH")]);
         assert!(field.evaluate(&matching_event));
-    }#[test]
+    }
 
+    #[test]
+    fn test_evaluate_exists() {
+        let field = Field::new(
+            "test|exists",
+            vec![
+                FieldValue::from(true),
+            ],
+        )
+        .unwrap();
+        let event_no_match = Event::from([("blah", "where IS evil")]);
+        assert!(!field.evaluate(&event_no_match));
+        let matching_event = Event::from([("test", "what are these")]);
+        assert!(field.evaluate(&matching_event));
+    } 
+
+    #[test]
+    fn test_evaluate_not_exists() {
+        let field = Field::new(
+            "test|exists",
+            vec![
+                FieldValue::from(false),
+            ],
+        )
+        .unwrap();
+        let event_no_match = Event::from([("test", "where IS evil")]);
+        assert!(!field.evaluate(&event_no_match));
+        let matching_event = Event::from([("blah", "what are these")]);
+        assert!(field.evaluate(&matching_event));
+    } 
+    
+    #[test]
     fn test_evaluate_wildcards() {
         let mut field = Field::new(
             "test",
