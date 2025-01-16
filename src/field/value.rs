@@ -274,10 +274,7 @@ impl FieldValue {
                     regexes.insert(b.to_string(), r.clone());
                     r.is_match(a).unwrap()
                 } else {
-                    if cased {
-                        return a.contains(b)
-                    }
-                    return a.to_lowercase().contains(&b.to_lowercase())
+                    return a.contains(b)
                 }
             }
             _ => false,
@@ -296,10 +293,7 @@ impl FieldValue {
                     regexes.insert(b.to_string(), r.clone());
                     r.is_match(a).unwrap()
                 } else {
-                    if cased {
-                        return a.starts_with(b)
-                    }
-                    return a.to_lowercase().starts_with(&b.to_lowercase())
+                    return a.starts_with(b)
                 }
             }
             _ => false,
@@ -318,10 +312,7 @@ impl FieldValue {
                     regexes.insert(b.to_string(), r.clone());
                     r.is_match(a).unwrap()
                 } else {
-                    if cased {
-                        return a.ends_with(b)
-                    }
-                    return a.to_lowercase().ends_with(&b.to_lowercase())
+                    return a.ends_with(b)
                 }
             }
             _ => false,
@@ -340,10 +331,7 @@ impl FieldValue {
                     regexes.insert(b.to_string(), r.clone());
                     r.is_match(a).unwrap()
                 } else {
-                    if cased {
-                        return a == b
-                    }
-                    return a.to_lowercase() == b.to_lowercase()
+                    return a == b;
                 }
             }
             _ => self == other,

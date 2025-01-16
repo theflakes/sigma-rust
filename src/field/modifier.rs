@@ -1,5 +1,5 @@
 use crate::error::ParserError;
-use crate::field::ValueTransformer::{Base64, Base64offset, Cased, Windash};
+use crate::field::ValueTransformer::{Base64, Base64offset};
 use std::str::FromStr;
 use strum::{Display, EnumString};
 
@@ -30,7 +30,7 @@ pub enum ValueTransformer {
     Base64(Option<Utf16Modifier>),
     Base64offset(Option<Utf16Modifier>),
     Windash,
-    Cased,
+    // Cased,
 }
 
 #[derive(Debug, Default)]
@@ -39,7 +39,7 @@ pub struct Modifier {
     pub(crate) fieldref: bool,
     pub(crate) cased: bool,
     pub(crate) match_modifier: Option<MatchModifier>,
-    pub(crate) value_transformer: Vec<Option<ValueTransformer>>,
+    pub(crate) value_transformer: Option<ValueTransformer>,
 }
 
 impl FromStr for Utf16Modifier {
@@ -55,31 +55,31 @@ impl FromStr for Utf16Modifier {
     }
 }
 
-pub fn is_valid_transformers(transformers: &Vec<Option<ValueTransformer>>) -> (bool, String, String) {
-    let mut base64_or_offset_present = false;
-    let mut windash_or_cased_present = false;
-    let mut base = String::new();
-    let mut dash_or_case = String::new();
+// pub fn is_valid_transformers(transformers: &Vec<Option<ValueTransformer>>) -> (bool, String, String) {
+//     let mut base64_or_offset_present = false;
+//     let mut windash_or_cased_present = false;
+//     let mut base = String::new();
+//     let mut dash_or_case = String::new();
 
-    for transformer in transformers.iter().flatten() {
-        match transformer {
-            Base64(_) | Base64offset(_) => {
-                base64_or_offset_present = true;
-                base = transformer.to_string();
-            }
-            Windash | Cased => {
-                windash_or_cased_present = true;
-                dash_or_case = transformer.to_string();
-            }
-        }
-    }
+//     for transformer in transformers.iter().flatten() {
+//         match transformer {
+//             Base64(_) | Base64offset(_) => {
+//                 base64_or_offset_present = true;
+//                 base = transformer.to_string();
+//             }
+//             Windash | Cased => {
+//                 windash_or_cased_present = true;
+//                 dash_or_case = transformer.to_string();
+//             }
+//         }
+//     }
 
-    if base64_or_offset_present && windash_or_cased_present {
-        return (false, base, dash_or_case)
-    }
+//     if base64_or_offset_present && windash_or_cased_present {
+//         return (false, base, dash_or_case)
+//     }
 
-    return (true, base, dash_or_case)
-}
+//     return (true, base, dash_or_case)
+// }
 
 impl FromStr for Modifier {
     type Err = ParserError;
@@ -95,6 +95,10 @@ impl FromStr for Modifier {
             }
             if s == "fieldref" {
                 result.fieldref = true;
+                continue;
+            }
+            if s == "cased" {
+                result.cased = true;
                 continue;
             }
 
@@ -131,7 +135,13 @@ impl FromStr for Modifier {
             }
 
             if let Ok(value_transformer) = ValueTransformer::from_str(&s) {
-                result.value_transformer.push(Some(value_transformer));
+                if let Some(v) = result.value_transformer {
+                    return Err(Self::Err::ConflictingModifiers(
+                        value_transformer.to_string(),
+                        v.to_string(),
+                    ));
+                }
+                result.value_transformer = Some(value_transformer);
                 continue;
             }
 
@@ -139,37 +149,29 @@ impl FromStr for Modifier {
         }
 
         if utf16_modifier.is_some() {
-            let utf16_modifier = utf16_modifier.clone();
-            let mut modified = false;
-            for value_transformer in result.value_transformer.iter_mut() {
-                if let Some(transformer) = value_transformer {
-                    match transformer {
-                        Base64(_) => {
-                            *value_transformer = Some(Base64(utf16_modifier.clone()));
-                            modified = true;
-                        }
-                        Base64offset(_) => {
-                            *value_transformer = Some(Base64offset(utf16_modifier.clone()));
-                            modified = true;
-                        }
-                        _ => return Err(Self::Err::Utf16WithoutBase64),
+            match result.value_transformer {
+                Some(value_transformer) => match value_transformer {
+                    Base64(_) => result.value_transformer = Some(Base64(utf16_modifier)),
+                    Base64offset(_) => {
+                        result.value_transformer = Some(Base64offset(utf16_modifier))
                     }
+                    _ => return Err(Self::Err::Utf16WithoutBase64),
+                },
+                None => {
+                    return Err(Self::Err::Utf16WithoutBase64);
                 }
-            }
-            if !modified {
-                return Err(Self::Err::Utf16WithoutBase64);
             }
         }
     
-        let (is_valid, base, dash_or_case) = is_valid_transformers(&result.value_transformer);
-        if !is_valid {
-            return Err(Self::Err::ConflictingModifiers(base, dash_or_case));
-        }
+        // let (is_valid, base, dash_or_case) = is_valid_transformers(&result.value_transformer);
+        // if !is_valid {
+        //     return Err(Self::Err::ConflictingModifiers(base, dash_or_case));
+        // }
 
         if let (Some(MatchModifier::Re) 
             | Some(MatchModifier::Cidr)
             | Some(MatchModifier::Exists), Some(_)) =
-            (&result.match_modifier, &result.value_transformer.iter().flatten().next())
+            (&result.match_modifier, &result.value_transformer)
         {
             return Err(Self::Err::StandaloneViolation(
                 result.match_modifier.as_ref().unwrap().to_string(),

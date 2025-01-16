@@ -9,7 +9,7 @@ use crate::error::ParserError;
 use crate::error::ParserError::{IPParsing, InvalidYAML};
 use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
-use crate::field::ValueTransformer::{Base64, Base64offset, Windash, Cased};
+use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
 use cidr::IpCidr;
 use fancy_regex::Regex; // supports lookarounds
 use serde_yml::Value;
@@ -24,6 +24,19 @@ pub struct Field {
     pub values: Vec<FieldValue>,
     pub regexes: RefCell<HashMap<String, Regex>>, // cache any patterns with globs (*, ?) converted to regex
     pub(crate) modifier: Modifier,
+}
+
+/// Lowercase the given value if it is a string and the cased modifier is not provided
+macro_rules! conditional_lowercase {
+    ($value:expr, $cased:expr) => {
+        if $cased {
+            $value
+        } else if let FieldValue::String(s) = $value {
+            &FieldValue::String(s.to_lowercase())
+        } else {
+            $value
+        }
+    };
 }
 
 impl FromStr for Field {
@@ -126,37 +139,31 @@ impl Field {
             _ => {}
         }
 
-        self.modifier.cased = false;
-        for vtx in self.modifier.value_transformer.iter() {
-            match vtx {
-                Some(Cased) => {
-                    self.modifier.cased = true
-                }
-                Some(Base64(utf16)) => {
-                    self.values = self
-                        .values
-                        .iter()
-                        .map(|val| FieldValue::String(encode_base64(val, utf16)))
-                        .collect();
-                }
-                Some(Base64offset(utf16)) => {
-                    self.values = self
-                        .values
-                        .iter()
-                        .flat_map(|val| encode_base64_offset(val, utf16))
-                        .map(FieldValue::String)
-                        .collect();
-                }
-                Some(Windash) => {
-                    self.values = self
-                        .values
-                        .iter()
-                        .flat_map(windash_variations)
-                        .map(FieldValue::String)
-                        .collect();
-                }
-                None => {}
+        match &self.modifier.value_transformer {
+            Some(Base64(utf16)) => {
+                self.values = self
+                    .values
+                    .iter()
+                    .map(|val| FieldValue::String(encode_base64(val, utf16)))
+                    .collect();
             }
+            Some(Base64offset(utf16)) => {
+                self.values = self
+                    .values
+                    .iter()
+                    .flat_map(|val| encode_base64_offset(val, utf16))
+                    .map(FieldValue::String)
+                    .collect();
+            }
+            Some(Windash) => {
+                self.values = self
+                    .values
+                    .iter()
+                    .flat_map(windash_variations)
+                    .map(FieldValue::String)
+                    .collect();
+            }
+            None => {}
         }
 
         Ok(())
@@ -203,17 +210,19 @@ impl Field {
                 return true;
             }
 
+            let target = conditional_lowercase!(target, self.modifier.cased);
+
             for val in self.values.iter() {
                 let cmp = if self.modifier.fieldref {
                     if let Some(EventValue::Value(value)) =
                         event.get(val.value_to_string().as_str())
                     {
-                        value
+                        conditional_lowercase!(value, self.modifier.cased)
                     } else {
                         continue;
                     }
                 } else {
-                    val
+                    conditional_lowercase!(val, self.modifier.cased)
                 };
 
                 let fired = self.compare(target, cmp);
@@ -250,7 +259,7 @@ mod tests {
         let field = Field::from_str("a").unwrap();
         assert_eq!(field.name, "a");
         assert!(field.modifier.match_modifier.is_none());
-        assert!(field.modifier.value_transformer.is_empty());
+        assert!(field.modifier.value_transformer.is_none());
         assert!(!field.modifier.match_all);
     }
 
@@ -262,7 +271,7 @@ mod tests {
             field.modifier.match_modifier.unwrap(),
             MatchModifier::Contains
         );
-        assert!(field.modifier.value_transformer.is_empty());
+        assert!(field.modifier.value_transformer.is_none());
         assert!(!field.modifier.match_all);
     }
 
@@ -271,21 +280,26 @@ mod tests {
         let field = Field::from_str("hello|windash|contains").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::Contains));
-        assert!(field.modifier.value_transformer.contains(&Some(ValueTransformer::Windash)));    }
+        assert_eq!(field.modifier.value_transformer, Some(Windash));
+    }
 
     #[test]
     fn test_parse_base64_modifier() {
         let field = Field::from_str("hello|base64|endswith").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::EndsWith));
-        assert!(field.modifier.value_transformer.contains(&Some(ValueTransformer::Base64(None))));
+        assert_eq!(field.modifier.value_transformer, Some(Base64(None)));
     }
+
     #[test]
     fn test_parse_utf16_modifier() {
         let field = Field::from_str("hello|base64offset|utf16le|endswith").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::EndsWith));
-        assert!(field.modifier.value_transformer.contains(&Some(Base64offset(Some(Utf16Modifier::Utf16le)))));
+        assert_eq!(
+            field.modifier.value_transformer,
+            Some(Base64offset(Some(Utf16Modifier::Utf16le)))
+        );
     }
 
     #[test]
@@ -308,7 +322,7 @@ mod tests {
     #[test]
     fn test_evaluate_cased() {
         let mut field = Field::new(
-            "test",
+            "test|cased",
             vec![
                 FieldValue::from("zsh"),
                 FieldValue::from("BASH"),
@@ -316,7 +330,8 @@ mod tests {
             ],
         )
         .unwrap();
-        field.modifier.cased = true;
+        // field.modifier.cased = true;
+        println!("{:?}", field.modifier.cased);
         let event_no_match = Event::from([("test", "bash")]);
         assert!(!field.evaluate(&event_no_match));
         let matching_event = Event::from([("test", "BASH")]);
