@@ -141,11 +141,6 @@ impl FromStr for Modifier {
                 }
             }
         }
-    
-        // let (is_valid, base, dash_or_case) = is_valid_transformers(&result.value_transformer);
-        // if !is_valid {
-        //     return Err(Self::Err::ConflictingModifiers(base, dash_or_case));
-        // }
 
         if let (Some(MatchModifier::Re) | Some(MatchModifier::Cidr), Some(_)) =
             (&result.match_modifier, &result.value_transformer)
