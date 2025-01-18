@@ -6,7 +6,7 @@ use walkdir::WalkDir;
 
 #[test]
 fn test_parse_sigma_main_rules() {
-    let sigma_dir = "sigma-main-rules";
+    let sigma_dir = "./sigma";
     let mut num_successful = 0;
     let mut num_failed = 0;
     let mut total = 0;
