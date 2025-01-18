@@ -97,13 +97,18 @@ impl Field {
             return Err(ParserError::EmptyValues(self.name.to_string()));
         }
 
-        match self.modifier.match_modifier {
-            Some(MatchModifier::Exists) => {
-                match bool::from_str(&self.values[0].value_to_string()) {
-                    Ok(b) => self.values[0] = FieldValue::Boolean(b),
-                    Err(err) => return Err(ParserError::ConflictingModifiers(self.values[0].value_to_string(), err.to_string())),
-                }
+        if self.modifier.exists.is_some() {
+            if self.values.len() != 1 {
+                return Err(ParserError::InvalidValueForExists());
             }
+            if let FieldValue::Boolean(b) = self.values[0] {
+                self.modifier.exists = Some(b);
+            } else {
+                return Err(ParserError::InvalidValueForExists());
+            }
+        }
+
+        match self.modifier.match_modifier {
             Some(MatchModifier::Contains)
             | Some(MatchModifier::StartsWith)
             | Some(MatchModifier::EndsWith) => {
@@ -172,15 +177,6 @@ impl Field {
     #[inline(always)]
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
         match self.modifier.match_modifier {
-            Some(MatchModifier::Exists) => {
-                if value == &FieldValue::Boolean(true) { // field exists
-                    return true
-                } else if value == &FieldValue::Boolean(false) 
-                  && target == &FieldValue::Boolean(true) { // true for field|exist: false
-                    return true
-                }
-                false
-            },
             Some(MatchModifier::Contains) => target.contains(value, self.modifier.cased, &mut self.regexes.borrow_mut()),
             Some(MatchModifier::StartsWith) => target.starts_with(value, self.modifier.cased, &mut self.regexes.borrow_mut()),
             Some(MatchModifier::EndsWith) => target.ends_with(value, self.modifier.cased, &mut self.regexes.borrow_mut()),
@@ -201,52 +197,52 @@ impl Field {
     
     #[inline(always)]
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
-        if let Some(EventValue::Value(target)) = event.get(&self.name) {
-            if self.values.is_empty() {
-                // self.values should never be empty.
-                // But, if it somehow happens we must return true, because
-                //      1. the key exists in the event, and
-                //      2. the field has no further conditions defined
-                return true;
-            }
+        let Some(event_value) = event.get(&self.name) else {
+            return matches!(self.modifier.exists, Some(false));
+        };
 
-            let target = conditional_lowercase!(target, self.modifier.cased);
+        if matches!(self.modifier.exists, Some(true)) {
+            return true;
+        };
 
-            for val in self.values.iter() {
-                let cmp = if self.modifier.fieldref {
-                    if let Some(EventValue::Value(value)) =
-                        event.get(val.value_to_string().as_str())
-                    {
-                        conditional_lowercase!(value, self.modifier.cased)
-                    } else {
-                        continue;
-                    }
-                } else {
-                    conditional_lowercase!(val, self.modifier.cased)
-                };
+        let EventValue::Value(target) = event_value else {
+            // We currently do not support matching against lists and hashmaps, see
+            // https://github.com/jopohl/sigma-rust/issues/9
+            return false;
+        };
 
-                let fired = self.compare(target, cmp);
-                if fired && !self.modifier.match_all {
-                    return true;
-                } else if !fired && self.modifier.match_all {
-                    return false;
-                }
-            }
-            // After the loop, there are two options:
-            // 1. match_all = false: no condition fired  => return false
-            // 2. match_all = true: all conditions fired => return true
-            self.modifier.match_all
-        } else {
-            // we need to capture if a field we don't want to exist doesn't exist
-            if self.modifier.match_modifier == Some(MatchModifier::Exists) { 
-                for val in self.values.iter() {
-                    if val == &FieldValue::Boolean(false) {
-                        return true;
-                    }
-                }
-            }
-            false
+        if self.values.is_empty() {
+            // self.values should never be empty.
+            // But, if it somehow happens we must return true, because
+            //      1. the key exists in the event, and
+            //      2. the field has no further conditions defined
+            return true;
         }
+
+        let target = conditional_lowercase!(target, self.modifier.cased);
+
+        for val in self.values.iter() {
+            let cmp = if self.modifier.fieldref {
+                if let Some(EventValue::Value(value)) = event.get(val.value_to_string().as_str()) {
+                    conditional_lowercase!(value, self.modifier.cased)
+                } else {
+                    continue;
+                }
+            } else {
+                conditional_lowercase!(val, self.modifier.cased)
+            };
+
+            let fired = self.compare(target, cmp);
+            if fired && !self.modifier.match_all {
+                return true;
+            } else if !fired && self.modifier.match_all {
+                return false;
+            }
+        }
+        // After the loop, there are two options:
+        // 1. match_all = false: no condition fired  => return false
+        // 2. match_all = true: all conditions fired => return true
+        self.modifier.match_all
     }
 }
 

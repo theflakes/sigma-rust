@@ -12,17 +12,18 @@ pub enum ParserError {
     )]
     Utf16WithoutBase64,
 
-    #[error(
-        "The modifier '{0}' is ambiguous and therefore unsupported; use utf16le or utf16be instead"
-    )]
-    AmbiguousUtf16Modifier(String),
-
     #[error("No values provided for field '{0}'")]
     EmptyValues(String),
 
     #[error("Failed to parse regular expression: '{0}'")]
     RegexParsing(fancy_regex::Error),
     // RegexParsing(regex::Error),
+
+    #[error("The 'exists' modifier must not be combined with any other modifiers")]
+    ExistsNotStandalone(),
+
+    #[error("The 'exists' modifier requires a single boolean value")]
+    InvalidValueForExists(),
 
     #[error(
         "The modifier '{0}' must not be combined with other modifiers except 'all' and 'fieldref'"

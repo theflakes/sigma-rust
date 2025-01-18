@@ -9,7 +9,6 @@ pub enum MatchModifier {
     Contains,
     StartsWith,
     EndsWith,
-    Exists,
     Gt,
     Gte,
     Lt,
@@ -22,6 +21,8 @@ pub enum MatchModifier {
 pub enum Utf16Modifier {
     Utf16le,
     Utf16be,
+    Utf16,
+    Wide,
 }
 
 #[derive(Debug, PartialEq, Display, EnumString)]
@@ -33,11 +34,12 @@ pub enum ValueTransformer {
     // Cased,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Modifier {
     pub(crate) match_all: bool,
     pub(crate) fieldref: bool,
     pub(crate) cased: bool,
+    pub(crate) exists: Option<bool>,
     pub(crate) match_modifier: Option<MatchModifier>,
     pub(crate) value_transformer: Option<ValueTransformer>,
 }
@@ -49,37 +51,12 @@ impl FromStr for Utf16Modifier {
         match s.to_lowercase().as_str() {
             "utf16le" => Ok(Utf16Modifier::Utf16le),
             "utf16be" => Ok(Utf16Modifier::Utf16be),
-            "utf16" | "wide" => Err(ParserError::AmbiguousUtf16Modifier(s.to_string())),
+            "utf16" => Ok(Utf16Modifier::Utf16),
+            "wide" => Ok(Utf16Modifier::Wide),
             _ => Err(ParserError::UnknownModifier(s.to_string())),
         }
     }
 }
-
-// pub fn is_valid_transformers(transformers: &Vec<Option<ValueTransformer>>) -> (bool, String, String) {
-//     let mut base64_or_offset_present = false;
-//     let mut windash_or_cased_present = false;
-//     let mut base = String::new();
-//     let mut dash_or_case = String::new();
-
-//     for transformer in transformers.iter().flatten() {
-//         match transformer {
-//             Base64(_) | Base64offset(_) => {
-//                 base64_or_offset_present = true;
-//                 base = transformer.to_string();
-//             }
-//             Windash | Cased => {
-//                 windash_or_cased_present = true;
-//                 dash_or_case = transformer.to_string();
-//             }
-//         }
-//     }
-
-//     if base64_or_offset_present && windash_or_cased_present {
-//         return (false, base, dash_or_case)
-//     }
-
-//     return (true, base, dash_or_case)
-// }
 
 impl FromStr for Modifier {
     type Err = ParserError;
@@ -101,6 +78,12 @@ impl FromStr for Modifier {
                 result.cased = true;
                 continue;
             }
+            if s == "exists" {
+                // The real value of the exists modifier will be set during field parsing
+                // because it is the field value and here we only parse the field name.
+                result.exists = Some(bool::default());
+                continue;
+            }
 
             if let Ok(match_modifier) = MatchModifier::from_str(&s) {
                 if let Some(m) = result.match_modifier {
@@ -111,10 +94,6 @@ impl FromStr for Modifier {
                 }
                 result.match_modifier = Some(match_modifier);
                 continue;
-            }
-            match result.match_modifier {
-                Some(MatchModifier::Exists) => break,
-                _ => {}
             }
 
             match Utf16Modifier::from_str(&s) {
@@ -168,14 +147,22 @@ impl FromStr for Modifier {
         //     return Err(Self::Err::ConflictingModifiers(base, dash_or_case));
         // }
 
-        if let (Some(MatchModifier::Re) 
-            | Some(MatchModifier::Cidr)
-            | Some(MatchModifier::Exists), Some(_)) =
+        if let (Some(MatchModifier::Re) | Some(MatchModifier::Cidr), Some(_)) =
             (&result.match_modifier, &result.value_transformer)
         {
             return Err(Self::Err::StandaloneViolation(
                 result.match_modifier.as_ref().unwrap().to_string(),
             ));
+        }
+        
+        if result.exists.is_some() {
+            let tmp = Self {
+                exists: Some(bool::default()),
+                ..Default::default()
+            };
+            if result != tmp {
+                return Err(Self::Err::ExistsNotStandalone());
+            };
         }
 
         Ok(result)
@@ -184,7 +171,19 @@ impl FromStr for Modifier {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::*;    
+    
+    #[test]
+    fn test_exists_modifier() {
+        let modifier = Modifier::from_str("fieldname|exists").unwrap();
+        assert!(modifier.exists.is_some());
+    }
+
+    #[test]
+    fn test_conflicting_exists_modifier() {
+        let err = Modifier::from_str("fieldname|all|exists").unwrap_err();
+        assert!(matches!(err, ParserError::ExistsNotStandalone()));
+    }
 
     #[test]
     fn test_unknown_modifier() {
@@ -196,12 +195,6 @@ mod test {
     fn test_parse_conflicting_startswith_endswith_modifiers() {
         let err = Modifier::from_str("hello|contains|startswith").unwrap_err();
         assert!(matches!(err, ParserError::ConflictingModifiers(_, _)));
-    }
-
-    #[test]
-    fn test_ambiguous_utf16_modifier() {
-        let err = Modifier::from_str("hello|base64offset|utf16").unwrap_err();
-        assert!(matches!(err, ParserError::AmbiguousUtf16Modifier(ref a) if a == "utf16"));
     }
 
     #[test]
